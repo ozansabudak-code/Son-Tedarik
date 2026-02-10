@@ -8273,12 +8273,23 @@ def init_compliance_analysis_tab():
     """Uyumluluk Analizi - Sertifika, Kalite ve Termin Takip Sistemi"""
     global df_uyumluluk_global, df_sertifika_trafik_global
     
-    for widget in frame_compliance_analysis.winfo_children():
-        widget.destroy()
-    
-    # Veriyi yükle
-    load_cari_bilgiler()
-    load_sertifika_trafik()  # Sertifika trafik verisini de yükle
+    try:
+        print("🔧 DEBUG: init_compliance_analysis_tab() başlatıldı")
+        
+        for widget in frame_compliance_analysis.winfo_children():
+            widget.destroy()
+        
+        # Veriyi yükle
+        print("🔧 DEBUG: Veri yükleniyor...")
+        load_cari_bilgiler()
+        load_sertifika_trafik()  # Sertifika trafik verisini de yükle
+        print(f"🔧 DEBUG: Veri yüklendi - Ana: {len(df_uyumluluk_global) if df_uyumluluk_global is not None else 0} kayıt")
+    except Exception as e:
+        print(f"❌ HATA: init_compliance_analysis_tab başlatma hatası: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        messagebox.showerror("Başlatma Hatası", f"Uyumluluk Analizi sekmesi başlatılamadı:\n{str(e)}")
+        return
     
     # Başlık - Turkuaz arka plan
     header = tk.Frame(frame_compliance_analysis, bg="#16a085", padx=20, pady=20)
@@ -8662,6 +8673,7 @@ def init_compliance_analysis_tab():
     
     audit_text.config(state="disabled")
     
+    print("🔧 DEBUG: Bilgi paneli oluşturuluyor...")
     # ⭐ BURADA AI BUTONU VE KAYIT BUTONU VAR - BİLGİ PANELİ
     info_panel = tk.Frame(content, bg="#3498db", padx=15, pady=10, relief="solid", bd=2)
     info_panel.pack(fill="x", pady=(0, 15))
@@ -8674,6 +8686,7 @@ def init_compliance_analysis_tab():
              font=("Segoe UI", 10), bg="#3498db", fg="white").pack(anchor="w", padx=20)
     tk.Label(info_panel, text="• Kaydetme butonu AI butonunun altındadır (büyük yeşil buton)",
              font=("Segoe UI", 10), bg="#3498db", fg="white").pack(anchor="w", padx=20)
+    print("🔧 DEBUG: Bilgi paneli oluşturuldu ✓")
     
     # Yenile butonu
     def refresh_data():
@@ -8774,6 +8787,7 @@ def init_compliance_analysis_tab():
         if activity_logger:
             activity_logger.log_event("AI_ANALYSIS", f"Tedarikçi: {supplier_name}", "Tedarikçi Uyumluluk")
     
+    print("🔧 DEBUG: AI butonu oluşturuluyor...")
     # AI Button - GELİŞTİRİLMİŞ VE DAHA GÖRÜNÜR
     ai_button = tk.Button(ai_frame, text="🤖 AI İLE ANALİZ YAP", 
                          font=("Segoe UI", 13, "bold"),
@@ -8783,6 +8797,7 @@ def init_compliance_analysis_tab():
                          cursor="hand2", padx=30, pady=15, 
                          command=run_ai_analysis)
     ai_button.pack(pady=(15, 5))
+    print("🔧 DEBUG: AI butonu oluşturuldu ✓")
     
     # AI button açıklama
     tk.Label(ai_frame, text="↑ Bu butona tıklayarak seçili tedarikçi için AI destekli detaylı analiz yapabilirsiniz", 
@@ -8811,6 +8826,7 @@ def init_compliance_analysis_tab():
                          font=("Segoe UI", 10), bg="white", fg="#2c3e50", wraplength=700, justify="left")
     save_info.pack(pady=(0, 10))
     
+    print("🔧 DEBUG: Kaydetme butonu oluşturuluyor...")
     save_button = tk.Button(save_frame, text="💾 Excel'e Kaydet", 
                            font=("Segoe UI", 11, "bold"),
                            bg="#27ae60", fg="white",
@@ -8819,12 +8835,14 @@ def init_compliance_analysis_tab():
                            cursor="hand2", padx=25, pady=12,
                            command=save_data_to_excel)
     save_button.pack()
+    print("🔧 DEBUG: Kaydetme butonu oluşturuldu ✓")
     
     save_warning = tk.Label(save_frame, 
                            text="⚠️ Not: Kaydetme işlemi mevcut Excel dosyasını güncelleyecektir.", 
                            font=("Segoe UI", 9, "italic"), bg="white", fg="gray")
     save_warning.pack(pady=(10, 0))
     
+    print("🔧 DEBUG: Tedarikçi ekleme formu oluşturuluyor...")
     # Yeni Tedarikçi Ekleme Formu
     add_supplier_frame = tk.LabelFrame(content, text="➕ Yeni Tedarikçi Ekle", 
                                       font=("Segoe UI", 13, "bold"), bg="white", fg="#3498db",
@@ -8916,6 +8934,9 @@ def init_compliance_analysis_tab():
                        cursor="hand2", padx=25, pady=10,
                        command=add_new_supplier)
     add_btn.pack(pady=(10, 0))
+    print("🔧 DEBUG: Tedarikçi ekleme formu oluşturuldu ✓")
+    
+    print("✅ BAŞARILI: init_compliance_analysis_tab() tamamlandı - Tüm UI elemanları oluşturuldu!")
 
 # ---------- GUI BAŞLATILMASI ----------
 def show_page(page_name):
@@ -8945,8 +8966,10 @@ def show_page(page_name):
             init_stok_tab()
         # Tedarikçi Uyumluluk - 2 Sayfa
         elif page_name == "Sertifika & Sözleşme":
+            print(f"🔧 DEBUG: Sayfa gösteriliyor - {page_name}")
             init_compliance_docs_tab()  # Eski yapı - belge görüntüleyici
         elif page_name == "Uyumluluk Analizi":
+            print(f"🔧 DEBUG: Sayfa gösteriliyor - {page_name}")
             init_compliance_analysis_tab()  # Yeni yapı - analiz ve skorlama
         # Reklamasyon pages initialization on demand
         elif page_name == "Rek Yönetici Özeti":
