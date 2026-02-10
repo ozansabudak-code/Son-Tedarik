@@ -251,6 +251,12 @@ gantt_canvas_global = None
 commodity_prices_global = {}
 commodity_history_global = {}
 
+# Tedarikçi Uyumluluk Merkezi Global Değişkenler
+df_uyumluluk_global = None
+df_sertifika_trafik_global = None  # Sertifika durumu ve trafik ışığı verisi
+cari_bilgiler_path = r"X:\01.Public\TEDARİKÇİ PERFORMANS\Cari Bilgiler\Cari Bilgiler.xlsx"
+sertifika_trafik_path = r"X:\01.Public\TEDARİKÇİ PERFORMANS\Cari Bilgiler\Sertifika Durumu Trafik ışığı.xlsx"
+
 # Frame Yönetimi Global Değişkenler
 frames = {} 
 menu_buttons = {} 
@@ -7550,24 +7556,300 @@ def send_compliance_email(supplier_email, supplier_name, compliance_data, ai_mes
 
 # ========== END OF AI HELPER FUNCTIONS ==========
 
-def init_compliance_center_tab():
-    """Tedarikçi Uyumluluk Merkezi - AI Destekli Sertifika ve Sözleşme Yönetimi"""
+# ========== TEDARİKÇİ UYUMLULUK MERKEZİ HELPER FUNCTIONS ==========
+
+# Constants for Tedarikçi Uyumluluk Merkezi
+COMPLIANCE_DATE_FORMAT = '%Y-%m-%d'
+CERT_SCORE_PER_CERTIFICATE = 40 / 3  # Total 40 points divided by 3 certificates
+TOTAL_CERT_POINTS = 40
+TOTAL_DELIVERY_POINTS = 30
+TOTAL_QUALITY_POINTS = 30
+
+def calculate_complaint_rate(reklamasyon_count, total_orders):
+    """Helper function to calculate complaint rate percentage"""
+    if total_orders > 0:
+        return (reklamasyon_count / total_orders) * 100
+    return 0
+
+def load_cari_bilgiler():
+    """Excel'den cari bilgileri yükle veya örnek veri kullan"""
+    global df_uyumluluk_global
+    
+    try:
+        if os.path.exists(cari_bilgiler_path):
+            df_uyumluluk_global = pd.read_excel(cari_bilgiler_path)
+            if activity_logger:
+                activity_logger.log_data_load("Cari Bilgiler", len(df_uyumluluk_global), "Uyumluluk Analizi")
+            return True
+        else:
+            # Örnek veri kullan - Yeni Excel formatı ile
+            df_uyumluluk_global = pd.DataFrame({
+                'Tedarikçi Adı': ['ABC Tekstil', 'XYZ Kimya', 'DEF Kumaş', 'GHI İplik', 'JKL Boya'],
+                'Yetkili Kişi': ['Ahmet Yılmaz', 'Mehmet Demir', 'Ayşe Kaya', 'Fatma Şahin', 'Ali Öz'],
+                'Telefon': ['0532 111 2233', '0533 222 3344', '0534 333 4455', '0535 444 5566', '0536 555 6677'],
+                'Adres': ['İstanbul', 'Bursa', 'İzmir', 'Denizli', 'Gaziantep'],
+                'Alım Türü': ['İthalat', 'Yerli', 'İthalat', 'Yerli', 'Yerli'],
+                'Tür': ['Tekstil', 'Kimya', 'Kumaş', 'İplik', 'Boya'],
+                'Mail': ['info@abctekstil.com', 'iletisim@xyzkimya.com', 'info@defkumas.com', 'satış@ghiiplik.com', 'info@jklboya.com'],
+                'Başlangıç Tarihi': ['2024-01-15', '2023-06-20', '2024-03-10', '2023-09-05', '2024-05-18'],
+                'Bitiş Tarihi': ['2026-01-15', '2025-06-20', '2026-03-10', '2025-09-05', '2026-05-18'],
+                'Kayıt Tarihi': ['2024-01-10', '2023-06-15', '2024-03-05', '2023-09-01', '2024-05-15'],
+                'Eksik Evraklar': ['', 'OEKO-TEX', '', 'ISO 9001', ''],
+                # Uyumluluk analizi için ek kolonlar
+                'ISO 9001': ['Var', 'Var', 'Yok', 'Yok', 'Var'],
+                'ISO 9001 Bitiş': ['2026-06-15', '2025-12-30', None, None, '2025-03-10'],
+                'OEKO-TEX': ['Var', 'Yok', 'Var', 'Var', 'Yok'],
+                'OEKO-TEX Bitiş': ['2026-09-20', None, '2026-05-15', '2025-11-30', None],
+                'BSCI': ['Var', 'Var', 'Yok', 'Var', 'Var'],
+                'BSCI Bitiş': ['2026-04-10', '2026-07-25', None, '2025-10-05', '2026-01-15'],
+                'Termin Uyum %': [95, 78, 88, 92, 65],
+                'Reklamasyon Sayısı': [2, 8, 4, 3, 12],
+                'Toplam Sipariş': [150, 200, 180, 160, 250],
+                'Son Denetim': ['2025-09-10', '2025-06-20', '2025-11-05', '2025-08-15', '2024-12-20'],
+                'Sonraki Denetim': ['2026-03-10', '2026-06-20', '2026-05-05', '2026-02-15', '2025-12-20']
+            })
+            if activity_logger:
+                activity_logger.log_event("SAMPLE_DATA", "Örnek veri kullanıldı - Excel dosyası bulunamadı", "Uyumluluk Analizi")
+            return False
+    except Exception as e:
+        # Hata durumunda örnek veri kullan
+        df_uyumluluk_global = pd.DataFrame({
+            'Tedarikçi Adı': ['ABC Tekstil', 'XYZ Kimya', 'DEF Kumaş', 'GHI İplik', 'JKL Boya'],
+            'Yetkili Kişi': ['Ahmet Yılmaz', 'Mehmet Demir', 'Ayşe Kaya', 'Fatma Şahin', 'Ali Öz'],
+            'Telefon': ['0532 111 2233', '0533 222 3344', '0534 333 4455', '0535 444 5566', '0536 555 6677'],
+            'Adres': ['İstanbul', 'Bursa', 'İzmir', 'Denizli', 'Gaziantep'],
+            'Alım Türü': ['İthalat', 'Yerli', 'İthalat', 'Yerli', 'Yerli'],
+            'Tür': ['Tekstil', 'Kimya', 'Kumaş', 'İplik', 'Boya'],
+            'Mail': ['info@abctekstil.com', 'iletisim@xyzkimya.com', 'info@defkumas.com', 'satış@ghiiplik.com', 'info@jklboya.com'],
+            'Başlangıç Tarihi': ['2024-01-15', '2023-06-20', '2024-03-10', '2023-09-05', '2024-05-18'],
+            'Bitiş Tarihi': ['2026-01-15', '2025-06-20', '2026-03-10', '2025-09-05', '2026-05-18'],
+            'Kayıt Tarihi': ['2024-01-10', '2023-06-15', '2024-03-05', '2023-09-01', '2024-05-15'],
+            'Eksik Evraklar': ['', 'OEKO-TEX', '', 'ISO 9001', ''],
+            'ISO 9001': ['Var', 'Var', 'Yok', 'Yok', 'Var'],
+            'ISO 9001 Bitiş': ['2026-06-15', '2025-12-30', None, None, '2025-03-10'],
+            'OEKO-TEX': ['Var', 'Yok', 'Var', 'Var', 'Yok'],
+            'OEKO-TEX Bitiş': ['2026-09-20', None, '2026-05-15', '2025-11-30', None],
+            'BSCI': ['Var', 'Var', 'Yok', 'Var', 'Var'],
+            'BSCI Bitiş': ['2026-04-10', '2026-07-25', None, '2025-10-05', '2026-01-15'],
+            'Termin Uyum %': [95, 78, 88, 92, 65],
+            'Reklamasyon Sayısı': [2, 8, 4, 3, 12],
+            'Toplam Sipariş': [150, 200, 180, 160, 250],
+            'Son Denetim': ['2025-09-10', '2025-06-20', '2025-11-05', '2025-08-15', '2024-12-20'],
+            'Sonraki Denetim': ['2026-03-10', '2026-06-20', '2026-05-05', '2026-02-15', '2025-12-20']
+        })
+        if activity_logger:
+            activity_logger.log_error(f"Excel yükleme hatası: {str(e)}", "Uyumluluk Analizi")
+        return False
+
+def load_sertifika_trafik():
+    """Sertifika Durumu ve Trafik Işığı Excel'ini yükle"""
+    global df_sertifika_trafik_global
+    
+    try:
+        if os.path.exists(sertifika_trafik_path):
+            df_sertifika_trafik_global = pd.read_excel(sertifika_trafik_path)
+            if activity_logger:
+                activity_logger.log_data_load("Sertifika Trafik", len(df_sertifika_trafik_global), "Uyumluluk Analizi")
+            return True
+        else:
+            # Örnek veri - Sertifika trafik verisi
+            df_sertifika_trafik_global = pd.DataFrame({
+                'Tedarikçi Adı': ['ABC Tekstil', 'XYZ Kimya', 'DEF Kumaş', 'GHI İplik', 'JKL Boya'],
+                'ISO 9001': ['Var', 'Var', 'Yok', 'Yok', 'Var'],
+                'ISO 9001 Bitiş': ['2026-06-15', '2025-12-30', None, None, '2025-03-10'],
+                'OEKO-TEX': ['Var', 'Yok', 'Var', 'Var', 'Yok'],
+                'OEKO-TEX Bitiş': ['2026-09-20', None, '2026-05-15', '2025-11-30', None],
+                'BSCI': ['Var', 'Var', 'Yok', 'Var', 'Var'],
+                'BSCI Bitiş': ['2026-04-10', '2026-07-25', None, '2025-10-05', '2026-01-15'],
+                'ISO 14001': ['Var', 'Yok', 'Var', 'Yok', 'Var'],
+                'ISO 14001 Bitiş': ['2026-03-20', None, '2026-08-10', None, '2025-11-15'],
+                'SEDEX': ['Var', 'Var', 'Yok', 'Var', 'Yok'],
+                'SEDEX Bitiş': ['2026-12-30', '2026-01-15', None, '2025-10-20', None]
+            })
+            if activity_logger:
+                activity_logger.log_event("SAMPLE_DATA", "Sertifika trafik örnek veri kullanıldı", "Uyumluluk Analizi")
+            return False
+    except Exception as e:
+        # Hata durumunda örnek veri
+        df_sertifika_trafik_global = pd.DataFrame({
+            'Tedarikçi Adı': ['ABC Tekstil', 'XYZ Kimya', 'DEF Kumaş', 'GHI İplik', 'JKL Boya'],
+            'ISO 9001': ['Var', 'Var', 'Yok', 'Yok', 'Var'],
+            'ISO 9001 Bitiş': ['2026-06-15', '2025-12-30', None, None, '2025-03-10'],
+            'OEKO-TEX': ['Var', 'Yok', 'Var', 'Var', 'Yok'],
+            'OEKO-TEX Bitiş': ['2026-09-20', None, '2026-05-15', '2025-11-30', None],
+            'BSCI': ['Var', 'Var', 'Yok', 'Var', 'Var'],
+            'BSCI Bitiş': ['2026-04-10', '2026-07-25', None, '2025-10-05', '2026-01-15'],
+            'ISO 14001': ['Var', 'Yok', 'Var', 'Yok', 'Var'],
+            'ISO 14001 Bitiş': ['2026-03-20', None, '2026-08-10', None, '2025-11-15'],
+            'SEDEX': ['Var', 'Var', 'Yok', 'Var', 'Yok'],
+            'SEDEX Bitiş': ['2026-12-30', '2026-01-15', None, '2025-10-20', None]
+        })
+        if activity_logger:
+            activity_logger.log_error(f"Sertifika trafik yükleme hatası: {str(e)}", "Uyumluluk Analizi")
+        return False
+
+def save_to_excel():
+    """Mevcut veriyi Excel dosyasına kaydet"""
+    global df_uyumluluk_global
+    
+    try:
+        if df_uyumluluk_global is None or df_uyumluluk_global.empty:
+            return False, "Kaydedilecek veri yok!"
+        
+        # Excel'e kaydet
+        df_uyumluluk_global.to_excel(cari_bilgiler_path, index=False)
+        
+        if activity_logger:
+            activity_logger.log_event("EXCEL_SAVE", f"Veri kaydedildi: {len(df_uyumluluk_global)} kayıt", "Uyumluluk Analizi")
+        
+        return True, f"✅ {len(df_uyumluluk_global)} kayıt başarıyla kaydedildi!"
+        
+    except Exception as e:
+        error_msg = f"Excel kaydetme hatası: {str(e)}"
+        if activity_logger:
+            activity_logger.log_error(error_msg, "Uyumluluk Analizi")
+        return False, f"❌ {error_msg}"
+
+def check_certificate_expiry(row, cert_name, cert_date_col):
+    """Sertifika son kullanma tarihini kontrol et ve trafik ışığı döndür
+    
+    Returns:
+        tuple: (status_text, color, priority) - Status text with icon, color hex code, and priority (0-999)
+    """
+    if pd.isna(row.get(cert_date_col)) or row.get(cert_name) != 'Var':
+        return "⚫ Yok", "gray", 999
+    
+    try:
+        cert_date = pd.to_datetime(row[cert_date_col])
+        today = datetime.now()
+        days_left = (cert_date - today).days
+        
+        if days_left < 0:
+            return "🔴 Süresi Dolmuş", "#e74c3c", 0
+        elif days_left <= 30:
+            return f"🟠 {days_left} Gün", "#e67e22", 1
+        elif days_left <= 90:
+            return f"🟡 {days_left} Gün", "#f39c12", 2
+        else:
+            return f"🟢 {days_left} Gün", "#27ae60", 3
+    except (ValueError, TypeError, KeyError) as e:
+        if activity_logger:
+            activity_logger.log_error(f"Sertifika tarihi hatası ({cert_name}): {str(e)}", "Tedarikçi Uyumluluk")
+        return "⚪ Tarih Hatası", "gray", 999
+
+def calculate_compliance_score(row):
+    """Uyumluluk skoru hesapla (0-100)"""
+    try:
+        score = 0
+        
+        # Sertifika puanı (40 puan)
+        cert_score = 0
+        certs = ['ISO 9001', 'OEKO-TEX', 'BSCI']
+        for cert in certs:
+            if cert in row.index and row.get(cert) == 'Var':
+                cert_score += CERT_SCORE_PER_CERTIFICATE
+        score += min(cert_score, TOTAL_CERT_POINTS)
+        
+        # Termin uyumu (30 puan)
+        termin_uyum = row.get('Termin Uyum %', 0) if 'Termin Uyum %' in row.index else 0
+        if termin_uyum:
+            score += (float(termin_uyum) / 100) * TOTAL_DELIVERY_POINTS
+        
+        # Kalite uyumu (30 puan) - Reklamasyon sayısına göre
+        reklamasyon = row.get('Reklamasyon Sayısı', 0) if 'Reklamasyon Sayısı' in row.index else 0
+        siparis = row.get('Toplam Sipariş', 1) if 'Toplam Sipariş' in row.index else 1
+        
+        # Eğer sipariş 0 ise division by zero hatası önlemek için 1 kullan
+        if siparis == 0:
+            siparis = 1
+            
+        rek_orani = calculate_complaint_rate(reklamasyon, siparis)
+        
+        # Reklamasyon oranı %5'in altındaysa tam puan
+        if rek_orani <= 5:
+            kalite_score = TOTAL_QUALITY_POINTS
+        elif rek_orani <= 10:
+            kalite_score = TOTAL_QUALITY_POINTS * 0.67
+        elif rek_orani <= 15:
+            kalite_score = TOTAL_QUALITY_POINTS * 0.33
+        else:
+            kalite_score = 0
+        score += kalite_score
+        
+        return round(score, 1)
+    except Exception as e:
+        print(f"⚠️ Uyarı: Skor hesaplama hatası - {str(e)}")
+        return 0.0  # Varsayılan skor
+
+def get_risk_level(score):
+    """Risk seviyesi belirle"""
+    if score >= 80:
+        return "🟢 Düşük", "#27ae60"
+    elif score >= 60:
+        return "🟠 Orta", "#f39c12"
+    else:
+        return "🔴 Yüksek", "#e74c3c"
+
+def ai_compliance_analysis(tedarikci_adi, row):
+    """AI destekli uyumluluk analizi - Gemini API kullanarak"""
+    if not GENAI_AVAILABLE:
+        return "❌ Google Generative AI kütüphanesi yüklü değil. Lütfen 'pip install google-generativeai' komutu ile yükleyin."
+    
+    if not GEMINI_API_KEY:
+        return "❌ Gemini API Key girilmedi. Lütfen API Key'inizi girin."
+    
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-pro')
+        
+        # Veriyi hazırla
+        uyumluluk_skoru = calculate_compliance_score(row)
+        risk_level, _ = get_risk_level(uyumluluk_skoru)
+        
+        prompt = f"""
+        Tedarikçi Adı: {tedarikci_adi}
+        
+        Performans Verileri:
+        - Uyumluluk Skoru: {uyumluluk_skoru}/100
+        - Risk Seviyesi: {risk_level}
+        - Termin Uyum: %{row.get('Termin Uyum %', 0)}
+        - Reklamasyon Sayısı: {row.get('Reklamasyon Sayısı', 0)}
+        - Toplam Sipariş: {row.get('Toplam Sipariş', 0)}
+        
+        Sertifikalar:
+        - ISO 9001: {row.get('ISO 9001', 'Yok')} ({row.get('ISO 9001 Bitiş', 'N/A')})
+        - OEKO-TEX: {row.get('OEKO-TEX', 'Yok')} ({row.get('OEKO-TEX Bitiş', 'N/A')})
+        - BSCI: {row.get('BSCI', 'Yok')} ({row.get('BSCI Bitiş', 'N/A')})
+        
+        Bu tedarikçi ile çalışmaya devam edilmeli mi? Detaylı risk değerlendirmesi ve öneriler sun.
+        """
+        
+        response = model.generate_content(prompt)
+        return response.text
+        
+    except Exception as e:
+        return f"❌ AI Analiz Hatası: {str(e)}"
+
+# ========== END OF TEDARİKÇİ UYUMLULUK HELPER FUNCTIONS ==========
+
+def init_compliance_docs_tab():
+    """Sertifika & Sözleşme Görüntüleyici - Belge Yönetimi ve Fire Satış Kontrolü"""
     import glob
     from datetime import datetime, timedelta
     
-    for widget in frame_compliance.winfo_children():
+    for widget in frame_compliance_docs.winfo_children():
         widget.destroy()
     
     # Başlık
-    header = tk.Frame(frame_compliance, bg="#2c3e50", padx=20, pady=20)
+    header = tk.Frame(frame_compliance_docs, bg="#2c3e50", padx=20, pady=20)
     header.pack(fill="x")
-    tk.Label(header, text="🏛️ Tedarikçi Uyumluluk Merkezi (AI Powered)", font=("Segoe UI", 20, "bold"), 
+    tk.Label(header, text="🏛️ Sertifika & Sözleşme Yönetimi", font=("Segoe UI", 20, "bold"), 
              fg="white", bg="#2c3e50").pack(anchor="w")
-    tk.Label(header, text="Supplier Compliance Center - Fire Satış Kontrol & Çevre Uyumluluk", 
+    tk.Label(header, text="Belge Görüntüleme, Fire Satış Kontrolü & Çevre Uyumluluk", 
              font=("Segoe UI", 11), fg="#ecf0f1", bg="#2c3e50").pack(anchor="w")
     
     # Scrollable canvas container
-    canvas_container = tk.Frame(frame_compliance)
+    canvas_container = tk.Frame(frame_compliance_docs)
     canvas_container.pack(fill="both", expand=True)
     
     # Canvas and scrollbar
@@ -7928,7 +8210,7 @@ def init_compliance_center_tab():
                                 subprocess.call(['open', filepath])
                             if activity_logger:
                                 activity_logger.log_activity(f"Belge açıldı: {os.path.basename(filepath)}", 
-                                                            "Tedarikçi Uyumluluk")
+                                                            "Sertifika & Sözleşme")
                         except Exception as e:
                             messagebox.showerror("Hata", f"Dosya açılırken hata oluştu:\n{str(e)}")
                     
@@ -7993,9 +8275,690 @@ def init_compliance_center_tab():
         cursor="hand2",
         padx=15,
         pady=8,
-        command=init_compliance_center_tab
+        command=init_compliance_docs_tab
     )
     refresh_btn.pack(pady=(10, 0))
+
+def init_compliance_analysis_tab():
+    """Uyumluluk Analizi - Sertifika, Kalite ve Termin Takip Sistemi"""
+    global df_uyumluluk_global, df_sertifika_trafik_global
+    
+    try:
+        print("🔧 DEBUG: init_compliance_analysis_tab() başlatıldı")
+        
+        for widget in frame_compliance_analysis.winfo_children():
+            widget.destroy()
+        
+        # Veriyi yükle
+        print("🔧 DEBUG: Veri yükleniyor...")
+        load_cari_bilgiler()
+        load_sertifika_trafik()  # Sertifika trafik verisini de yükle
+        print(f"🔧 DEBUG: Veri yüklendi - Ana: {len(df_uyumluluk_global) if df_uyumluluk_global is not None else 0} kayıt")
+    except Exception as e:
+        print(f"❌ HATA: init_compliance_analysis_tab başlatma hatası: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        messagebox.showerror("Başlatma Hatası", f"Uyumluluk Analizi sekmesi başlatılamadı:\n{str(e)}")
+        return
+    
+    # Başlık - Turkuaz arka plan
+    header = tk.Frame(frame_compliance_analysis, bg="#16a085", padx=20, pady=20)
+    header.pack(fill="x")
+    tk.Label(header, text="📊 Tedarikçi Uyumluluk Analizi", font=("Segoe UI", 20, "bold"), 
+             fg="white", bg="#16a085").pack(anchor="w")
+    tk.Label(header, text="Sertifika takibi, kalite skoru, risk analizi ve AI destekli uyumluluk değerlendirmesi", 
+             font=("Segoe UI", 11), fg="#ecf0f1", bg="#16a085").pack(anchor="w")
+    
+    # Veri durumu bilgisi - YENI
+    data_status_frame = tk.Frame(header, bg="#16a085")
+    data_status_frame.pack(fill="x", pady=(10, 0))
+    
+    # Ana veri durumu
+    main_data_status = "✅ Yüklendi" if df_uyumluluk_global is not None and not df_uyumluluk_global.empty else "⚠️ Örnek Veri"
+    main_data_count = len(df_uyumluluk_global) if df_uyumluluk_global is not None else 0
+    
+    # Sertifika veri durumu
+    cert_data_status = "✅ Yüklendi" if df_sertifika_trafik_global is not None and not df_sertifika_trafik_global.empty else "⚠️ Örnek Veri"
+    cert_data_count = len(df_sertifika_trafik_global) if df_sertifika_trafik_global is not None else 0
+    
+    status_text = f"📁 Ana Veri: {main_data_status} ({main_data_count} kayıt)  |  📜 Sertifika Verisi: {cert_data_status} ({cert_data_count} kayıt)"
+    tk.Label(data_status_frame, text=status_text, font=("Segoe UI", 9), 
+             fg="white", bg="#16a085").pack(anchor="w")
+    
+    # Dosya yolu bilgisi
+    if df_sertifika_trafik_global is None or df_sertifika_trafik_global.empty:
+        tk.Label(data_status_frame, 
+                text=f"⚠️ Sertifika dosyası bulunamadı: {os.path.basename(sertifika_trafik_path)}", 
+                font=("Segoe UI", 8, "italic"), 
+                fg="#f39c12", bg="#16a085").pack(anchor="w")
+    else:
+        tk.Label(data_status_frame, 
+                text=f"📂 Yüklenen dosya: {os.path.basename(sertifika_trafik_path)}", 
+                font=("Segoe UI", 8, "italic"), 
+                fg="#ecf0f1", bg="#16a085").pack(anchor="w")
+    
+    # Scrollable canvas container
+    canvas_container = tk.Frame(frame_compliance_analysis)
+    canvas_container.pack(fill="both", expand=True)
+    
+    # Canvas and scrollbar
+    canvas = tk.Canvas(canvas_container, bg="#ecf0f1", highlightthickness=0)
+    scrollbar = ttk.Scrollbar(canvas_container, orient="vertical", command=canvas.yview)
+    
+    # Frame inside canvas
+    content = tk.Frame(canvas, padx=15, pady=15, bg="#ecf0f1")
+    
+    # Configure scrolling
+    canvas.configure(yscrollcommand=scrollbar.set)
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+    
+    # Create window in canvas
+    canvas_frame = canvas.create_window((0, 0), window=content, anchor="nw")
+    
+    # Update scrollregion when content changes
+    def on_frame_configure(event=None):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+        canvas.itemconfig(canvas_frame, width=canvas.winfo_width())
+    
+    content.bind("<Configure>", on_frame_configure)
+    canvas.bind("<Configure>", on_frame_configure)
+    
+    # Mouse wheel scrolling
+    def on_mousewheel(event):
+        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    
+    canvas.bind_all("<MouseWheel>", on_mousewheel)
+    
+    # Check if data is available
+    if df_uyumluluk_global is None or df_uyumluluk_global.empty:
+        tk.Label(content, text="⚠️ Veri yüklenemedi. Lütfen cari bilgiler dosyasını kontrol edin.", 
+                 font=("Segoe UI", 12), bg="#ecf0f1", fg="#e74c3c").pack(pady=50)
+        return
+    
+    print(f"🔧 DEBUG: Veri kolonları: {list(df_uyumluluk_global.columns)}")
+    
+    # Calculate compliance scores
+    try:
+        print("🔧 DEBUG: Uyumluluk skorları hesaplanıyor...")
+        df_uyumluluk_global['Compliance Score'] = df_uyumluluk_global.apply(calculate_compliance_score, axis=1)
+        print("🔧 DEBUG: Uyumluluk skorları hesaplandı ✓")
+    except Exception as e:
+        print(f"❌ HATA: Uyumluluk skoru hesaplama hatası: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        # Varsayılan skor ata
+        df_uyumluluk_global['Compliance Score'] = 0
+        messagebox.showwarning("Uyarı", f"Uyumluluk skorları hesaplanamadı. Varsayılan değerler kullanılıyor.\n\nHata: {str(e)}")
+    
+    # KPI Kartları
+    kpi_container = tk.Frame(content, bg="#ecf0f1")
+    kpi_container.pack(fill="x", pady=(0, 15))
+    
+    def create_kpi_card(parent, title, value, icon, color):
+        """KPI kartı oluştur"""
+        card = tk.Frame(parent, bg="white", bd=2, relief="solid", padx=20, pady=15)
+        card.pack(side="left", padx=5, expand=True, fill="both")
+        
+        tk.Label(card, text=icon, font=("Segoe UI", 28), bg="white", fg=color).pack()
+        tk.Label(card, text=title, font=("Segoe UI", 10), bg="white", fg="gray").pack(pady=(5,0))
+        tk.Label(card, text=value, font=("Segoe UI", 18, "bold"), bg="white", fg=color).pack()
+        
+        return card
+    
+    # Calculate KPIs
+    avg_score = df_uyumluluk_global['Compliance Score'].mean()
+    high_risk = len(df_uyumluluk_global[df_uyumluluk_global['Compliance Score'] < 60])
+    medium_risk = len(df_uyumluluk_global[(df_uyumluluk_global['Compliance Score'] >= 60) & 
+                                           (df_uyumluluk_global['Compliance Score'] < 80)])
+    low_risk = len(df_uyumluluk_global[df_uyumluluk_global['Compliance Score'] >= 80])
+    
+    # KPI Cards
+    create_kpi_card(kpi_container, "Ortalama Uyumluluk Skoru", f"{avg_score:.1f}", "📊", "#3498db")
+    create_kpi_card(kpi_container, "Yüksek Riskli Tedarikçi", f"{high_risk} 🔴", "⚠️", "#e74c3c")
+    create_kpi_card(kpi_container, "Orta Riskli Tedarikçi", f"{medium_risk} 🟠", "⚡", "#f39c12")
+    create_kpi_card(kpi_container, "Düşük Riskli Tedarikçi", f"{low_risk} 🟢", "✅", "#27ae60")
+    
+    # Detaylı Tedarikçi Bilgileri Tablosu
+    detail_frame = tk.LabelFrame(content, text="📋 Tedarikçi Detay Bilgileri", 
+                               font=("Segoe UI", 13, "bold"), bg="white", fg="#16a085",
+                               padx=15, pady=15, relief="solid", bd=2)
+    detail_frame.pack(fill="x", pady=(0, 15))
+    
+    # Tablo için frame ve scrollbar
+    detail_table_container = tk.Frame(detail_frame, bg="white")
+    detail_table_container.pack(fill="both", expand=True)
+    
+    # Treeview - Detaylı bilgiler
+    detail_columns = ("Tedarikçi", "Yetkili", "Telefon", "Adres", "Tür", "Alım", "Mail", "Başlangıç", "Bitiş", "Eksik Evraklar")
+    detail_tree = ttk.Treeview(detail_table_container, columns=detail_columns, show="headings", height=6)
+    
+    # Column headings ve genişlikler
+    column_widths = {
+        "Tedarikçi": 120,
+        "Yetkili": 100,
+        "Telefon": 100,
+        "Adres": 80,
+        "Tür": 70,
+        "Alım": 70,
+        "Mail": 150,
+        "Başlangıç": 80,
+        "Bitiş": 80,
+        "Eksik Evraklar": 100
+    }
+    
+    for col in detail_columns:
+        detail_tree.heading(col, text=col)
+        detail_tree.column(col, width=column_widths.get(col, 100), anchor="center")
+    
+    # Insert data
+    for idx, row in df_uyumluluk_global.iterrows():
+        detail_tree.insert("", "end", values=(
+            row.get('Tedarikçi Adı', ''),
+            row.get('Yetkili Kişi', ''),
+            row.get('Telefon', ''),
+            row.get('Adres', ''),
+            row.get('Tür', ''),
+            row.get('Alım Türü', ''),
+            row.get('Mail', ''),
+            row.get('Başlangıç Tarihi', ''),
+            row.get('Bitiş Tarihi', ''),
+            row.get('Eksik Evraklar', '')
+        ))
+    
+    # Scrollbar
+    detail_tree_scroll = ttk.Scrollbar(detail_table_container, orient="vertical", command=detail_tree.yview)
+    detail_tree.configure(yscrollcommand=detail_tree_scroll.set)
+    
+    detail_tree.pack(side="left", fill="both", expand=True)
+    detail_tree_scroll.pack(side="right", fill="y")
+    
+    # Horizontal scrollbar
+    detail_tree_hscroll = ttk.Scrollbar(detail_frame, orient="horizontal", command=detail_tree.xview)
+    detail_tree.configure(xscrollcommand=detail_tree_hscroll.set)
+    detail_tree_hscroll.pack(fill="x")
+    
+    # Sertifika Takip Tablosu - Ayrı Excel'den yüklenen veri
+    cert_frame = tk.LabelFrame(content, text="📜 Sertifika Durumu ve Trafik Işığı (Ayrı Dosyadan)", 
+                               font=("Segoe UI", 13, "bold"), bg="white", fg="#16a085",
+                               padx=15, pady=15, relief="solid", bd=2)
+    cert_frame.pack(fill="x", pady=(0, 15))
+    
+    # Dosya yolu bilgisi
+    path_label = tk.Label(cert_frame, 
+                          text=f"📂 Kaynak: {os.path.basename(sertifika_trafik_path)}", 
+                          font=("Segoe UI", 8, "italic"), bg="white", fg="gray")
+    path_label.pack(anchor="w", pady=(0, 5))
+    
+    # Tablo için frame ve scrollbar
+    table_container = tk.Frame(cert_frame, bg="white")
+    table_container.pack(fill="both", expand=True)
+    
+    # Treeview - Genişletilmiş sertifika listesi
+    columns = ("Tedarikçi", "ISO 9001", "OEKO-TEX", "BSCI", "ISO 14001", "SEDEX", "Uyumluluk Skoru", "Risk")
+    tree = ttk.Treeview(table_container, columns=columns, show="headings", height=8)
+    
+    # Column headings
+    column_widths = {
+        "Tedarikçi": 120,
+        "ISO 9001": 120,
+        "OEKO-TEX": 120,
+        "BSCI": 120,
+        "ISO 14001": 120,
+        "SEDEX": 120,
+        "Uyumluluk Skoru": 120,
+        "Risk": 100
+    }
+    
+    for col in columns:
+        tree.heading(col, text=col)
+        tree.column(col, width=column_widths.get(col, 120), anchor="center")
+    
+    # Insert data - Sertifika trafik dosyasından
+    if df_sertifika_trafik_global is not None and not df_sertifika_trafik_global.empty:
+        for idx, cert_row in df_sertifika_trafik_global.iterrows():
+            # Sertifika durumları
+            iso_status_text, _, _ = check_certificate_expiry(cert_row, 'ISO 9001', 'ISO 9001 Bitiş')
+            oeko_status_text, _, _ = check_certificate_expiry(cert_row, 'OEKO-TEX', 'OEKO-TEX Bitiş')
+            bsci_status_text, _, _ = check_certificate_expiry(cert_row, 'BSCI', 'BSCI Bitiş')
+            iso14001_status_text, _, _ = check_certificate_expiry(cert_row, 'ISO 14001', 'ISO 14001 Bitiş')
+            sedex_status_text, _, _ = check_certificate_expiry(cert_row, 'SEDEX', 'SEDEX Bitiş')
+            
+            # Ana veriden uyumluluk skorunu al
+            tedarikci_adi = cert_row.get('Tedarikçi Adı', '')
+            score = 0
+            risk = "⚫ Veri Yok"
+            
+            if df_uyumluluk_global is not None and not df_uyumluluk_global.empty:
+                match = df_uyumluluk_global[df_uyumluluk_global['Tedarikçi Adı'] == tedarikci_adi]
+                if not match.empty:
+                    score = match.iloc[0].get('Compliance Score', 0)
+                    risk, risk_color = get_risk_level(score)
+            
+            tree.insert("", "end", values=(
+                tedarikci_adi,
+                iso_status_text,
+                oeko_status_text,
+                bsci_status_text,
+                iso14001_status_text,
+                sedex_status_text,
+                f"{score:.1f}",
+                risk
+            ))
+    else:
+        # Veri yoksa ana veriden göster
+        for idx, row in df_uyumluluk_global.iterrows():
+            iso_status_text, _, _ = check_certificate_expiry(row, 'ISO 9001', 'ISO 9001 Bitiş')
+            oeko_status_text, _, _ = check_certificate_expiry(row, 'OEKO-TEX', 'OEKO-TEX Bitiş')
+            bsci_status_text, _, _ = check_certificate_expiry(row, 'BSCI', 'BSCI Bitiş')
+            
+            score = row.get('Compliance Score', 0)
+            risk, risk_color = get_risk_level(score)
+            
+            tree.insert("", "end", values=(
+                row.get('Tedarikçi Adı', ''),
+                iso_status_text,
+                oeko_status_text,
+                bsci_status_text,
+                "⚫ Veri Yok",  # ISO 14001
+                "⚫ Veri Yok",  # SEDEX
+                f"{score:.1f}",
+                risk
+            ))
+    
+    # Scrollbar
+    tree_scroll = ttk.Scrollbar(table_container, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=tree_scroll.set)
+    
+    tree.pack(side="left", fill="both", expand=True)
+    tree_scroll.pack(side="right", fill="y")
+    
+    # Horizontal scrollbar for wide table
+    tree_hscroll = ttk.Scrollbar(cert_frame, orient="horizontal", command=tree.xview)
+    tree.configure(xscrollcommand=tree_hscroll.set)
+    tree_hscroll.pack(fill="x")
+    
+    # Grafik Bölümü
+    charts_container = tk.Frame(content, bg="#ecf0f1")
+    charts_container.pack(fill="both", expand=True, pady=(0, 15))
+    
+    # Sol: Bar Chart - Uyumluluk Skorları
+    left_chart = tk.LabelFrame(charts_container, text="📊 Tedarikçi Uyumluluk Skorları", 
+                               font=("Segoe UI", 12, "bold"), bg="white", fg="#16a085",
+                               padx=10, pady=10, relief="solid", bd=2)
+    left_chart.pack(side="left", fill="both", expand=True, padx=(0, 7))
+    
+    fig1, ax1 = plt.subplots(figsize=(6, 4), facecolor='white')
+    suppliers = df_uyumluluk_global['Tedarikçi Adı'].tolist()
+    scores = df_uyumluluk_global['Compliance Score'].tolist()
+    
+    colors_bar = ['#27ae60' if s >= 80 else '#f39c12' if s >= 60 else '#e74c3c' for s in scores]
+    ax1.barh(suppliers, scores, color=colors_bar)
+    ax1.set_xlabel('Uyumluluk Skoru', fontsize=10, fontweight='bold')
+    ax1.set_xlim(0, 100)
+    ax1.grid(axis='x', alpha=0.3)
+    plt.tight_layout()
+    
+    canvas1 = FigureCanvasTkAgg(fig1, master=left_chart)
+    canvas1.draw()
+    canvas1.get_tk_widget().pack(fill="both", expand=True)
+    
+    # Sağ: Bubble Chart - Risk Matrisi
+    right_chart = tk.LabelFrame(charts_container, text="🎯 Risk Matrisi (Termin vs Reklamasyon)", 
+                                font=("Segoe UI", 12, "bold"), bg="white", fg="#16a085",
+                                padx=10, pady=10, relief="solid", bd=2)
+    right_chart.pack(side="right", fill="both", expand=True, padx=(7, 0))
+    
+    fig2, ax2 = plt.subplots(figsize=(6, 4), facecolor='white')
+    
+    # Calculate complaint rate - handle missing columns
+    if 'Termin Uyum %' in df_uyumluluk_global.columns:
+        termin_uyum = df_uyumluluk_global['Termin Uyum %'].fillna(0).tolist()
+    else:
+        termin_uyum = [0] * len(df_uyumluluk_global)
+    
+    if 'Reklamasyon Sayısı' in df_uyumluluk_global.columns:
+        reklamasyon = df_uyumluluk_global['Reklamasyon Sayısı'].fillna(0).tolist()
+    else:
+        reklamasyon = [0] * len(df_uyumluluk_global)
+    
+    if 'Toplam Sipariş' in df_uyumluluk_global.columns:
+        siparis = df_uyumluluk_global['Toplam Sipariş'].fillna(1).tolist()
+    else:
+        siparis = [1] * len(df_uyumluluk_global)
+    
+    # Use helper function for complaint rate calculation
+    rek_orani = [calculate_complaint_rate(r, s) for r, s in zip(reklamasyon, siparis)]
+    bubble_sizes = [s*2 for s in siparis]  # Bubble size based on order volume
+    
+    scatter = ax2.scatter(termin_uyum, rek_orani, s=bubble_sizes, alpha=0.6, 
+                          c=scores, cmap='RdYlGn', edgecolors='black', linewidth=1)
+    
+    ax2.set_xlabel('Termin Uyum %', fontsize=10, fontweight='bold')
+    ax2.set_ylabel('Reklamasyon Oranı %', fontsize=10, fontweight='bold')
+    ax2.grid(True, alpha=0.3)
+    
+    # Add colorbar
+    cbar = plt.colorbar(scatter, ax=ax2)
+    cbar.set_label('Uyumluluk Skoru', fontsize=9)
+    
+    plt.tight_layout()
+    
+    canvas2 = FigureCanvasTkAgg(fig2, master=right_chart)
+    canvas2.draw()
+    canvas2.get_tk_widget().pack(fill="both", expand=True)
+    
+    # Denetim Takvimi
+    audit_frame = tk.LabelFrame(content, text="📅 Yaklaşan Denetimler (90 Gün İçinde)", 
+                                font=("Segoe UI", 13, "bold"), bg="white", fg="#16a085",
+                                padx=15, pady=15, relief="solid", bd=2)
+    audit_frame.pack(fill="x", pady=(0, 15))
+    
+    # Calculate upcoming audits
+    today = datetime.now()
+    ninety_days = today + timedelta(days=90)
+    
+    audit_text = tk.Text(audit_frame, height=6, font=("Segoe UI", 10), bg="#f8f9fa", 
+                        relief="flat", wrap="word")
+    audit_text.pack(fill="x")
+    
+    upcoming_audits = []
+    for idx, row in df_uyumluluk_global.iterrows():
+        next_audit = row.get('Sonraki Denetim', None)
+        if next_audit:
+            try:
+                if isinstance(next_audit, str):
+                    audit_date = datetime.strptime(next_audit, COMPLIANCE_DATE_FORMAT)
+                else:
+                    audit_date = pd.to_datetime(next_audit)
+                
+                if today <= audit_date <= ninety_days:
+                    days_left = (audit_date - today).days
+                    upcoming_audits.append({
+                        'supplier': row.get('Tedarikçi Adı', ''),
+                        'date': audit_date,
+                        'days': days_left
+                    })
+            except (ValueError, TypeError, AttributeError) as e:
+                supplier_name = row.get('Tedarikçi Adı', 'Bilinmeyen')
+                if activity_logger:
+                    activity_logger.log_error(f"Denetim tarihi hatası ({supplier_name}): {str(e)}. Beklenen format: {COMPLIANCE_DATE_FORMAT}", "Tedarikçi Uyumluluk")
+                pass
+    
+    if upcoming_audits:
+        upcoming_audits.sort(key=lambda x: x['days'])
+        for audit in upcoming_audits:
+            icon = "🔴" if audit['days'] <= 30 else "🟠" if audit['days'] <= 60 else "🟢"
+            audit_text.insert("end", f"{icon} {audit['supplier']}: {audit['date'].strftime('%d.%m.%Y')} ({audit['days']} gün kaldı)\n")
+    else:
+        audit_text.insert("end", "✅ 90 gün içinde yaklaşan denetim bulunmamaktadır.")
+    
+    audit_text.config(state="disabled")
+    
+    print("🔧 DEBUG: Bilgi paneli oluşturuluyor...")
+    # ⭐ BURADA AI BUTONU VE KAYIT BUTONU VAR - BİLGİ PANELİ
+    info_panel = tk.Frame(content, bg="#3498db", padx=15, pady=10, relief="solid", bd=2)
+    info_panel.pack(fill="x", pady=(0, 15))
+    
+    tk.Label(info_panel, text="⭐ ÖNEMLİ BİLGİ", font=("Segoe UI", 12, "bold"),
+             bg="#3498db", fg="white").pack(anchor="w")
+    tk.Label(info_panel, text="• Bu sayfada AI analizi butonu ve Excel'e kaydetme butonu bulunmaktadır",
+             font=("Segoe UI", 10), bg="#3498db", fg="white").pack(anchor="w", padx=20)
+    tk.Label(info_panel, text="• AI butonu için aşağı kaydırın (büyük mor buton)",
+             font=("Segoe UI", 10), bg="#3498db", fg="white").pack(anchor="w", padx=20)
+    tk.Label(info_panel, text="• Kaydetme butonu AI butonunun altındadır (büyük yeşil buton)",
+             font=("Segoe UI", 10), bg="#3498db", fg="white").pack(anchor="w", padx=20)
+    print("🔧 DEBUG: Bilgi paneli oluşturuldu ✓")
+    
+    # Yenile butonu
+    def refresh_data():
+        """Verileri yeniden yükle"""
+        init_compliance_analysis_tab()
+        messagebox.showinfo("Yenilendi", "Veriler yeniden yüklendi!")
+    
+    refresh_btn = tk.Button(info_panel, text="🔄 Verileri Yenile", 
+                           font=("Segoe UI", 10, "bold"),
+                           bg="#2ecc71", fg="white",
+                           relief="raised", bd=2,
+                           cursor="hand2", padx=15, pady=5,
+                           command=refresh_data)
+    refresh_btn.pack(anchor="e", pady=(5, 0))
+    
+    # AI Analiz Bölümü - GELİŞTİRİLMİŞ
+    ai_frame = tk.LabelFrame(content, text="🤖 AI Destekli Uyumluluk Analizi", 
+                            font=("Segoe UI", 14, "bold"), bg="white", fg="#8e44ad",
+                            padx=20, pady=20, relief="solid", bd=3)
+    ai_frame.pack(fill="both", expand=True, pady=(0, 15))
+    
+    # AI Form
+    ai_form = tk.Frame(ai_frame, bg="white")
+    ai_form.pack(fill="x", pady=(0, 15))
+    
+    tk.Label(ai_form, text="Tedarikçi Seçin:", font=("Segoe UI", 11, "bold"),
+             bg="white").grid(row=0, column=0, sticky="w", padx=5, pady=8)
+    
+    supplier_var = tk.StringVar()
+    supplier_combo = ttk.Combobox(ai_form, textvariable=supplier_var, 
+                                  values=df_uyumluluk_global['Tedarikçi Adı'].tolist(),
+                                  font=("Segoe UI", 11), state="readonly", width=30)
+    supplier_combo.grid(row=0, column=1, padx=5, pady=8, sticky="ew")
+    if len(df_uyumluluk_global) > 0:
+        supplier_combo.current(0)
+    
+    tk.Label(ai_form, text="Gemini API Key:", font=("Segoe UI", 11, "bold"),
+             bg="white").grid(row=1, column=0, sticky="w", padx=5, pady=8)
+    
+    api_key_entry = tk.Entry(ai_form, font=("Segoe UI", 11), width=30, show="*")
+    api_key_entry.grid(row=1, column=1, padx=5, pady=8, sticky="ew")
+    # Security: Do not pre-fill API key - require user to enter each session
+    
+    ai_form.grid_columnconfigure(1, weight=1)
+    
+    # Result Text Area
+    result_text = tk.Text(ai_frame, height=12, font=("Segoe UI", 10), bg="#f8f9fa", 
+                         relief="solid", bd=1, wrap="word")
+    result_text.pack(fill="both", expand=True, pady=(10, 0))
+    result_text.insert("1.0", "💡 Bir tedarikçi seçin ve aşağıdaki 'AI Analizi Yap' butonuna tıklayın...\n\n"
+                             "AI analizi tedarikçinin:\n"
+                             "• Sertifika durumunu\n"
+                             "• Uyumluluk skorunu\n"
+                             "• Risk seviyesini\n"
+                             "• Genel performansını değerlendirir ve öneriler sunar.")
+    result_text.config(state="disabled")
+    
+    def run_ai_analysis():
+        """AI analizi çalıştır"""
+        supplier_name = supplier_var.get()
+        api_key = api_key_entry.get()
+        
+        if not supplier_name:
+            messagebox.showwarning("Uyarı", "Lütfen bir tedarikçi seçin!")
+            return
+        
+        if not api_key:
+            messagebox.showwarning("Uyarı", "Lütfen Gemini API Key girin!")
+            return
+        
+        # Update global API key
+        global GEMINI_API_KEY
+        GEMINI_API_KEY = api_key
+        
+        result_text.config(state="normal")
+        result_text.delete("1.0", "end")
+        result_text.insert("1.0", "🔄 AI analizi yapılıyor, lütfen bekleyin...\n")
+        result_text.config(state="disabled")
+        result_text.update()
+        
+        # Get supplier data
+        supplier_data = df_uyumluluk_global[df_uyumluluk_global['Tedarikçi Adı'] == supplier_name]
+        if supplier_data.empty:
+            result_text.config(state="normal")
+            result_text.delete("1.0", "end")
+            result_text.insert("1.0", "❌ Tedarikçi verisi bulunamadı!")
+            result_text.config(state="disabled")
+            return
+        
+        row = supplier_data.iloc[0]
+        analysis = ai_compliance_analysis(supplier_name, row)
+        
+        result_text.config(state="normal")
+        result_text.delete("1.0", "end")
+        result_text.insert("1.0", analysis)
+        result_text.config(state="disabled")
+        
+        if activity_logger:
+            activity_logger.log_event("AI_ANALYSIS", f"Tedarikçi: {supplier_name}", "Tedarikçi Uyumluluk")
+    
+    print("🔧 DEBUG: AI butonu oluşturuluyor...")
+    # AI Button - GELİŞTİRİLMİŞ VE DAHA GÖRÜNÜR
+    ai_button = tk.Button(ai_frame, text="🤖 AI İLE ANALİZ YAP", 
+                         font=("Segoe UI", 13, "bold"),
+                         bg="#8e44ad", fg="white", 
+                         activebackground="#9b59b6", activeforeground="white",
+                         relief="raised", bd=4,
+                         cursor="hand2", padx=30, pady=15, 
+                         command=run_ai_analysis)
+    ai_button.pack(pady=(15, 5))
+    print("🔧 DEBUG: AI butonu oluşturuldu ✓")
+    
+    # AI button açıklama
+    tk.Label(ai_frame, text="↑ Bu butona tıklayarak seçili tedarikçi için AI destekli detaylı analiz yapabilirsiniz", 
+             font=("Segoe UI", 9, "italic"), bg="white", fg="gray").pack()
+    
+    # Veri Kaydetme Bölümü
+    save_frame = tk.LabelFrame(content, text="💾 Veri Kaydetme", 
+                               font=("Segoe UI", 13, "bold"), bg="white", fg="#27ae60",
+                               padx=15, pady=15, relief="solid", bd=2)
+    save_frame.pack(fill="x", pady=(0, 15))
+    
+    def save_data_to_excel():
+        """Mevcut veriyi Excel'e kaydet"""
+        success, message = save_to_excel()
+        
+        if success:
+            messagebox.showinfo("Başarılı", message)
+            if activity_logger:
+                activity_logger.log_event("DATA_SAVE", message, "Uyumluluk Analizi")
+        else:
+            messagebox.showerror("Hata", message)
+    
+    # Kaydetme butonu ve açıklama
+    save_info = tk.Label(save_frame, 
+                         text="📝 Tablodaki verilerde yaptığınız değişiklikleri Excel dosyasına kaydetmek için:", 
+                         font=("Segoe UI", 10), bg="white", fg="#2c3e50", wraplength=700, justify="left")
+    save_info.pack(pady=(0, 10))
+    
+    print("🔧 DEBUG: Kaydetme butonu oluşturuluyor...")
+    save_button = tk.Button(save_frame, text="💾 Excel'e Kaydet", 
+                           font=("Segoe UI", 11, "bold"),
+                           bg="#27ae60", fg="white",
+                           activebackground="#2ecc71", activeforeground="white",
+                           relief="raised", bd=3,
+                           cursor="hand2", padx=25, pady=12,
+                           command=save_data_to_excel)
+    save_button.pack()
+    print("🔧 DEBUG: Kaydetme butonu oluşturuldu ✓")
+    
+    save_warning = tk.Label(save_frame, 
+                           text="⚠️ Not: Kaydetme işlemi mevcut Excel dosyasını güncelleyecektir.", 
+                           font=("Segoe UI", 9, "italic"), bg="white", fg="gray")
+    save_warning.pack(pady=(10, 0))
+    
+    print("🔧 DEBUG: Tedarikçi ekleme formu oluşturuluyor...")
+    # Yeni Tedarikçi Ekleme Formu
+    add_supplier_frame = tk.LabelFrame(content, text="➕ Yeni Tedarikçi Ekle", 
+                                      font=("Segoe UI", 13, "bold"), bg="white", fg="#3498db",
+                                      padx=15, pady=15, relief="solid", bd=2)
+    add_supplier_frame.pack(fill="x", pady=(0, 15))
+    
+    tk.Label(add_supplier_frame, 
+            text="📝 Yeni tedarikçi eklemek için aşağıdaki formu doldurun ve 'Ekle' butonuna tıklayın:",
+            font=("Segoe UI", 10), bg="white", fg="#2c3e50", wraplength=700, justify="left").pack(pady=(0, 10))
+    
+    # Form grid
+    form_grid = tk.Frame(add_supplier_frame, bg="white")
+    form_grid.pack(fill="x")
+    
+    # Form fields
+    tk.Label(form_grid, text="Tedarikçi Adı *:", font=("Segoe UI", 10, "bold"), bg="white").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+    supplier_name_entry = tk.Entry(form_grid, font=("Segoe UI", 10), width=30)
+    supplier_name_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+    
+    tk.Label(form_grid, text="Yetkili Kişi:", font=("Segoe UI", 10, "bold"), bg="white").grid(row=0, column=2, sticky="w", padx=5, pady=5)
+    contact_entry = tk.Entry(form_grid, font=("Segoe UI", 10), width=25)
+    contact_entry.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
+    
+    tk.Label(form_grid, text="Telefon:", font=("Segoe UI", 10, "bold"), bg="white").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+    phone_entry = tk.Entry(form_grid, font=("Segoe UI", 10), width=30)
+    phone_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+    
+    tk.Label(form_grid, text="Mail:", font=("Segoe UI", 10, "bold"), bg="white").grid(row=1, column=2, sticky="w", padx=5, pady=5)
+    mail_entry = tk.Entry(form_grid, font=("Segoe UI", 10), width=25)
+    mail_entry.grid(row=1, column=3, padx=5, pady=5, sticky="ew")
+    
+    form_grid.grid_columnconfigure(1, weight=1)
+    form_grid.grid_columnconfigure(3, weight=1)
+    
+    def add_new_supplier():
+        """Yeni tedarikçi ekle"""
+        global df_uyumluluk_global
+        
+        supplier_name = supplier_name_entry.get().strip()
+        if not supplier_name:
+            messagebox.showwarning("Uyarı", "Tedarikçi adı zorunludur!")
+            return
+        
+        # Yeni satır oluştur
+        new_row = pd.DataFrame({
+            'Tedarikçi Adı': [supplier_name],
+            'Yetkili Kişi': [contact_entry.get().strip()],
+            'Telefon': [phone_entry.get().strip()],
+            'Adres': [''],
+            'Alım Türü': [''],
+            'Tür': [''],
+            'Mail': [mail_entry.get().strip()],
+            'Başlangıç Tarihi': [datetime.now().strftime('%Y-%m-%d')],
+            'Bitiş Tarihi': [''],
+            'Kayıt Tarihi': [datetime.now().strftime('%Y-%m-%d')],
+            'Eksik Evraklar': [''],
+            'ISO 9001': ['Yok'],
+            'ISO 9001 Bitiş': [None],
+            'OEKO-TEX': ['Yok'],
+            'OEKO-TEX Bitiş': [None],
+            'BSCI': ['Yok'],
+            'BSCI Bitiş': [None],
+            'Termin Uyum %': [0],
+            'Reklamasyon Sayısı': [0],
+            'Toplam Sipariş': [0],
+            'Son Denetim': [''],
+            'Sonraki Denetim': ['']
+        })
+        
+        # DataFrame'e ekle
+        df_uyumluluk_global = pd.concat([df_uyumluluk_global, new_row], ignore_index=True)
+        
+        # Formu temizle
+        supplier_name_entry.delete(0, tk.END)
+        contact_entry.delete(0, tk.END)
+        phone_entry.delete(0, tk.END)
+        mail_entry.delete(0, tk.END)
+        
+        messagebox.showinfo("Başarılı", f"'{supplier_name}' eklendi! Excel'e kaydetmeyi unutmayın.")
+        
+        if activity_logger:
+            activity_logger.log_event("SUPPLIER_ADD", f"Yeni tedarikçi eklendi: {supplier_name}", "Uyumluluk Analizi")
+    
+    add_btn = tk.Button(add_supplier_frame, text="➕ Tedarikçi Ekle", 
+                       font=("Segoe UI", 11, "bold"),
+                       bg="#3498db", fg="white",
+                       activebackground="#5dade2", activeforeground="white",
+                       relief="raised", bd=3,
+                       cursor="hand2", padx=25, pady=10,
+                       command=add_new_supplier)
+    add_btn.pack(pady=(10, 0))
+    print("🔧 DEBUG: Tedarikçi ekleme formu oluşturuldu ✓")
+    
+    print("✅ BAŞARILI: init_compliance_analysis_tab() tamamlandı - Tüm UI elemanları oluşturuldu!")
 
 # ---------- GUI BAŞLATILMASI ----------
 def show_page(page_name):
@@ -8023,9 +8986,13 @@ def show_page(page_name):
         # Stok Yönetimi initialization on demand
         elif page_name == "Stok Yönetimi":
             init_stok_tab()
-        # Tedarikçi Uyumluluk Merkezi initialization on demand
-        elif page_name == "Tedarikçi Uyumluluk":
-            init_compliance_center_tab()
+        # Tedarikçi Uyumluluk - 2 Sayfa
+        elif page_name == "Sertifika & Sözleşme":
+            print(f"🔧 DEBUG: Sayfa gösteriliyor - {page_name}")
+            init_compliance_docs_tab()  # Eski yapı - belge görüntüleyici
+        elif page_name == "Uyumluluk Analizi":
+            print(f"🔧 DEBUG: Sayfa gösteriliyor - {page_name}")
+            init_compliance_analysis_tab()  # Yeni yapı - analiz ve skorlama
         # Reklamasyon pages initialization on demand
         elif page_name == "Rek Yönetici Özeti":
             draw_rek_dashboard(frame_rek_ozet)
@@ -8141,8 +9108,9 @@ frame_eksik_fazla = ttk.Frame(content_area, padding="10")
 # Stok Yönetimi Frame
 frame_stok = ttk.Frame(content_area, padding="10")
 
-# Tedarikçi Uyumluluk Merkezi Frame
-frame_compliance = ttk.Frame(content_area, padding="10")
+# Tedarikçi Uyumluluk Merkezi Frames (2 ayrı sayfa)
+frame_compliance_docs = ttk.Frame(content_area, padding="10")  # Sertifika & Sözleşme Görüntüleyici
+frame_compliance_analysis = ttk.Frame(content_area, padding="10")  # Uyumluluk Analizi
 
 frames = {
     "Yönetim Paneli": frame_ozet,
@@ -8175,8 +9143,9 @@ frames = {
     "Eksik-Fazla Yüklemeler": frame_eksik_fazla,
     # Stok Yönetimi
     "Stok Yönetimi": frame_stok,
-    # Tedarikçi Uyumluluk Merkezi
-    "Tedarikçi Uyumluluk": frame_compliance
+    # Tedarikçi Uyumluluk Merkezi - 2 Sayfa
+    "Sertifika & Sözleşme": frame_compliance_docs,  # Belge görüntüleyici (eski yapı)
+    "Uyumluluk Analizi": frame_compliance_analysis  # Yeni analiz sayfası
 }
 
 menu_items = [
@@ -8190,7 +9159,8 @@ menu_items = [
     ("📅 Üretim Takibi", "Üretim Takibi"),  # YENİ: Sipariş Aşama Takibi - GANT
     ("💹 Hammadde Fiyatları", "Hammadde Fiyatları"),  # YENİ: Hammadde Fiyat İstihbaratı
     ("🏭 Defacto Üretim Raporları", "Stok Yönetimi"),  # YENİ: Üretim Takibi
-    ("🏛️ Tedarikçi Uyumluluk Merkezi", "Tedarikçi Uyumluluk"),  # YENİ: Sertifika ve Sözleşme Yönetimi
+    ("🏛️ Sertifika & Sözleşme", "Sertifika & Sözleşme"),  # Belge Görüntüleyici
+    ("📊 Uyumluluk Analizi", "Uyumluluk Analizi"),  # Uyumluluk Skoru ve Analiz
     ("📦 Eksik-Fazla Yüklemeler", "Eksik-Fazla Yüklemeler"),  # YENİ: Yükleme Analizi
     ("📝 Tedarikçi Karnesi", "Tedarikçi Karnesi"),
     ("📈 Aylık Trend", "Aylık Trend"),
