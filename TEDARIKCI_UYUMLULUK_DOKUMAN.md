@@ -1,12 +1,326 @@
-# Tedarikçi Uyumluluk Merkezi - Dokümantasyon
+# Tedarikçi Uyumluluk Sistemi - Dokümantasyon
 
 ## Genel Bakış
 
-"Son Tedarik" uygulamasına eklenen **Tedarikçi Uyumluluk Merkezi** modülü, tedarikçi sertifikalarının takibi, uyumluluk skorlaması, risk analizi, denetim takvimi ve AI destekli uyumluluk değerlendirmesi sağlar.
+"Son Tedarik" uygulamasına eklenen **Tedarikçi Uyumluluk Sistemi** iki ayrı modülden oluşur:
 
-## Özellikler
+1. **🏛️ Sertifika & Sözleşme Yönetimi**: Belge görüntüleme ve Fire Satış kontrolü
+2. **📊 Uyumluluk Analizi**: Sertifika takibi, risk skorlaması ve AI destekli analiz
 
-### 1. Sertifika Takibi (Trafik Işığı Sistemi)
+---
+
+## 1. Sertifika & Sözleşme Yönetimi
+
+### Özellikler
+
+#### Belge Görüntüleyici
+- **Sertifikalar**: PDF sertifikaları görüntüleme ve yönetme
+- **Sözleşmeler**: PDF sözleşmeleri görüntüleme ve yönetme
+- Dosya boyutu ve tarih bilgileri
+- Dosya açma ve yol kopyalama işlevleri
+
+#### Fire Satış Çevre Uyumluluk Kontrolü
+- **Kontrol Edilen Belgeler**:
+  - Çevre İzin ve Lisans Belgesi
+  - Atık Kodları Lisansı (200111)
+  - UATF (Ulusal Atık Taşıma Formu)
+  - Tartım Fişi / Kantar Belgesi
+  - Geri Kazanım Belgesi (R12)
+
+#### AI Destekli İşlevler
+- 🤖 AI ile sözleşme oluşturma
+- 📧 Tedarikçiye email gönderme
+- Şablon sözleşme kullanma desteği
+
+#### Veri Kaynakları
+- **Sertifikalar**: `X:\01.Public\TEDARİKÇİ PERFORMANS\Sertifikalar`
+- **Sözleşmeler**: `X:\01.Public\TEDARİKÇİ PERFORMANS\Sözleşme`
+
+---
+
+## 2. Uyumluluk Analizi
+
+### Özellikler
+
+#### A. Sertifika Takibi (Trafik Işığı Sistemi)
+- **🟢 Yeşil**: Sertifika süresi 90+ gün
+- **🟡 Sarı**: Sertifika süresi 30-90 gün arası
+- **🟠 Turuncu**: Sertifika süresi 0-30 gün arası
+- **🔴 Kırmızı**: Sertifika süresi dolmuş
+- **⚫ Siyah**: Sertifika yok
+
+Takip edilen sertifikalar:
+- ISO 9001
+- OEKO-TEX
+- BSCI
+
+#### B. Detaylı Tedarikçi Bilgileri
+Yeni Excel formatı ile entegre tablo:
+- **Tedarikçi Adı**: Firma adı
+- **Yetkili Kişi**: Yetkili kişi adı soyadı
+- **Telefon**: İletişim telefonu
+- **Adres**: Firma adresi
+- **Tür**: Tedarikçi türü (Tekstil, Kimya, vb.)
+- **Alım Türü**: İthalat veya Yerli
+- **Mail**: Email adresi
+- **Başlangıç Tarihi**: İş birliği başlangıç tarihi
+- **Bitiş Tarihi**: Sözleşme bitiş tarihi
+- **Kayıt Tarihi**: Sisteme kayıt tarihi
+- **Eksik Evraklar**: Eksik belge listesi
+
+#### C. Uyumluluk Skorkarti (0-100)
+
+Toplam 100 puan üzerinden hesaplanır:
+
+**Sertifika Puanı (40 puan)**
+- Her sertifika için: 40/3 = 13.33 puan
+- ISO 9001, OEKO-TEX, BSCI
+
+**Termin Uyumu (30 puan)**
+- Teslimat zamanında yapılma oranı
+- %100 termin uyumu = 30 puan
+
+**Kalite Uyumu (30 puan)**
+- Reklamasyon oranına göre hesaplanır:
+  - ≤%5 reklamasyon: 30 puan
+  - ≤%10 reklamasyon: 20 puan
+  - ≤%15 reklamasyon: 10 puan
+  - >%15 reklamasyon: 0 puan
+
+#### D. Risk Seviyeleri
+
+Uyumluluk skoruna göre risk kategorileri:
+- **🟢 Düşük Risk**: Skor ≥ 80
+- **🟠 Orta Risk**: Skor 60-79
+- **🔴 Yüksek Risk**: Skor < 60
+
+#### E. Risk Matrisi (Kabarcık Grafiği)
+
+Görsel risk analizi:
+- **X Ekseni**: Termin Uyum %
+- **Y Ekseni**: Reklamasyon Oranı %
+- **Kabarcık Boyutu**: Toplam sipariş hacmi
+- **Renk Gradyanı**: Uyumluluk skoru (kırmızı-sarı-yeşil)
+
+#### F. Denetim Takvimi
+
+90 gün içindeki yaklaşan denetimler:
+- **🔴**: ≤30 gün
+- **🟠**: 31-60 gün
+- **🟢**: 61-90 gün
+
+#### G. AI Destekli Analiz
+
+Gemini API kullanarak:
+- Tedarikçi performans değerlendirmesi
+- Risk analizi
+- İş birliği önerileri
+- Detaylı rapor oluşturma
+
+---
+
+## Excel Veri Yapısı
+
+### Dosya Yolu
+`X:\01.Public\TEDARİKÇİ PERFORMANS\Cari Bilgiler\Cari Bilgiler.xlsx`
+
+### Gerekli Kolonlar
+
+#### Temel Bilgiler
+```
+Tedarikçi Adı          | string  | Zorunlu
+Yetkili Kişi           | string  | Opsiyonel
+Telefon                | string  | Opsiyonel
+Adres                  | string  | Opsiyonel
+Alım Türü              | string  | "İthalat" veya "Yerli"
+Tür                    | string  | Tedarikçi kategorisi
+Mail                   | string  | Email adresi
+Başlangıç Tarihi       | date    | YYYY-MM-DD formatında
+Bitiş Tarihi           | date    | YYYY-MM-DD formatında
+Kayıt Tarihi           | date    | YYYY-MM-DD formatında
+Eksik Evraklar         | string  | Eksik belge listesi (virgülle ayrılmış)
+```
+
+#### Sertifika Bilgileri
+```
+ISO 9001               | string  | "Var" veya "Yok"
+ISO 9001 Bitiş         | date    | YYYY-MM-DD formatında
+OEKO-TEX               | string  | "Var" veya "Yok"
+OEKO-TEX Bitiş         | date    | YYYY-MM-DD formatında
+BSCI                   | string  | "Var" veya "Yok"
+BSCI Bitiş             | date    | YYYY-MM-DD formatında
+```
+
+#### Performans Metrikleri
+```
+Termin Uyum %          | number  | 0-100 arası
+Reklamasyon Sayısı     | number  | Pozitif tam sayı
+Toplam Sipariş         | number  | Pozitif tam sayı
+Son Denetim            | date    | YYYY-MM-DD formatında
+Sonraki Denetim        | date    | YYYY-MM-DD formatında
+```
+
+### Örnek Veri
+
+```csv
+Tedarikçi Adı,Yetkili Kişi,Telefon,Adres,Alım Türü,Tür,Mail,Başlangıç Tarihi,Bitiş Tarihi,Kayıt Tarihi,Eksik Evraklar,ISO 9001,ISO 9001 Bitiş,OEKO-TEX,OEKO-TEX Bitiş,BSCI,BSCI Bitiş,Termin Uyum %,Reklamasyon Sayısı,Toplam Sipariş,Son Denetim,Sonraki Denetim
+ABC Tekstil,Ahmet Yılmaz,0532 111 2233,İstanbul,İthalat,Tekstil,info@abctekstil.com,2024-01-15,2026-01-15,2024-01-10,,Var,2026-06-15,Var,2026-09-20,Var,2026-04-10,95,2,150,2025-09-10,2026-03-10
+```
+
+---
+
+## Teknik Detaylar
+
+### Global Değişkenler
+
+```python
+df_uyumluluk_global = None  # Uyumluluk verileri DataFrame
+cari_bilgiler_path = r"X:\01.Public\TEDARİKÇİ PERFORMANS\Cari Bilgiler\Cari Bilgiler.xlsx"
+```
+
+### Sabitler
+
+```python
+COMPLIANCE_DATE_FORMAT = '%Y-%m-%d'
+CERT_SCORE_PER_CERTIFICATE = 40 / 3
+TOTAL_CERT_POINTS = 40
+TOTAL_DELIVERY_POINTS = 30
+TOTAL_QUALITY_POINTS = 30
+```
+
+### Ana Fonksiyonlar
+
+#### 1. Belge Yönetimi
+```python
+def init_compliance_docs_tab():
+    """Sertifika & Sözleşme Görüntüleyici"""
+    # Fire satış kontrolü
+    # Belge görüntüleme
+    # AI sözleşme oluşturma
+    # Email gönderme
+```
+
+#### 2. Uyumluluk Analizi
+```python
+def init_compliance_analysis_tab():
+    """Uyumluluk Analizi ve Skorlama"""
+    # Veri yükleme
+    # Detaylı bilgi tablosu
+    # Sertifika takibi
+    # Risk analizi
+    # Denetim takvimi
+    # AI analizi
+```
+
+### Yardımcı Fonksiyonlar
+
+```python
+def load_cari_bilgiler():
+    """Excel'den veri yükle veya örnek veri kullan"""
+    
+def check_certificate_expiry(row, cert_name, cert_date_col):
+    """Sertifika süresini kontrol et"""
+    
+def calculate_compliance_score(row):
+    """Uyumluluk skorunu hesapla (0-100)"""
+    
+def get_risk_level(score):
+    """Risk seviyesini belirle"""
+    
+def calculate_complaint_rate(reklamasyon_count, total_orders):
+    """Reklamasyon oranını hesapla"""
+    
+def ai_compliance_analysis(tedarikci_adi, row):
+    """AI destekli uyumluluk analizi"""
+    
+def check_waste_disposal_compliance(supplier_name):
+    """Fire satış çevre uyumluluk kontrolü"""
+```
+
+---
+
+## Kullanım
+
+### 1. Sertifika & Sözleşme Yönetimi
+
+1. Sol menüden "🏛️ Sertifika & Sözleşme" seçin
+2. Fire Satış Kontrolü için:
+   - Tedarikçi adını girin
+   - "🔍 Uyumluluk Kontrolü Yap" tıklayın
+   - Sonuçları inceleyin
+3. AI Sözleşme Oluşturma:
+   - İsteğe bağlı şablon seçin
+   - "🤖 AI ile Sözleşme Oluştur" tıklayın
+4. Email Gönderme:
+   - Email adresini girin
+   - "📧 Tedarikçiye Email Gönder" tıklayın
+
+### 2. Uyumluluk Analizi
+
+1. Sol menüden "📊 Uyumluluk Analizi" seçin
+2. Otomatik olarak Excel verileri yüklenir
+3. Detaylı bilgileri ve sertifika durumlarını inceleyin
+4. Risk matrisini ve grafikleri görüntüleyin
+5. AI Analizi için:
+   - Tedarikçi seçin
+   - Gemini API Key girin
+   - "🤖 AI Analizi Yap" tıklayın
+
+---
+
+## Güvenlik
+
+### API Anahtarı
+- Otomatik olarak doldurulmaz
+- Her oturumda yeniden girilmelidir
+- Maskelenerek gösterilir (`show="*"`)
+
+### Veri Güvenliği
+- Tüm işlemler activity logger ile kaydedilir
+- Hata durumlarında detaylı log tutulur
+- Hassas veriler ekrana yazılmaz
+
+---
+
+## Sorun Giderme
+
+### "Veri yüklenemedi" Hatası
+- Excel dosya yolunu kontrol edin: `X:\01.Public\TEDARİKÇİ PERFORMANS\Cari Bilgiler\Cari Bilgiler.xlsx`
+- Dosya izinlerini kontrol edin
+- Örnek veri kullanılıyor olabilir (normal durum)
+
+### "Klasör bulunamadı" Hatası
+- Sertifika klasörü: `X:\01.Public\TEDARİKÇİ PERFORMANS\Sertifikalar`
+- Sözleşme klasörü: `X:\01.Public\TEDARİKÇİ PERFORMANS\Sözleşme`
+- Klasör yollarının doğru olduğunu kontrol edin
+
+### Tarih Hataları
+- Tarihlerin YYYY-MM-DD formatında olduğundan emin olun
+- Excel hücrelerinin "Text" veya "Date" formatında olduğunu kontrol edin
+
+---
+
+## Versiyon Geçmişi
+
+### v2.0.0 (2026-02-10)
+- **Yeni**: Sistem 2 ayrı sayfaya bölündü
+- Sertifika & Sözleşme Yönetimi (eski yapı korundu)
+- Uyumluluk Analizi (yeni Excel kolonları eklendi)
+- Detaylı tedarikçi bilgileri tablosu
+- 11 yeni kolon desteği
+
+### v1.0.0 (2026-02-10)
+- İlk versiyon
+- Tek sayfa yapısı
+- Temel sertifika takibi
+
+---
+
+## İletişim ve Destek
+
+Sorularınız için:
+- Email: ozan.sabudak@defacto.com
+- Sistem: Son Tedarik v2.8
 - **🟢 Yeşil**: Sertifika süresi 90+ gün
 - **🟡 Sarı**: Sertifika süresi 30-90 gün arası
 - **🟠 Turuncu**: Sertifika süresi 0-30 gün arası
