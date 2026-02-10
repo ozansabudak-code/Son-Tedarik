@@ -7739,37 +7739,47 @@ def check_certificate_expiry(row, cert_name, cert_date_col):
 
 def calculate_compliance_score(row):
     """Uyumluluk skoru hesapla (0-100)"""
-    score = 0
-    
-    # Sertifika puanı (40 puan)
-    cert_score = 0
-    certs = ['ISO 9001', 'OEKO-TEX', 'BSCI']
-    for cert in certs:
-        if row.get(cert) == 'Var':
-            cert_score += CERT_SCORE_PER_CERTIFICATE
-    score += min(cert_score, TOTAL_CERT_POINTS)
-    
-    # Termin uyumu (30 puan)
-    termin_uyum = row.get('Termin Uyum %', 0)
-    score += (termin_uyum / 100) * TOTAL_DELIVERY_POINTS
-    
-    # Kalite uyumu (30 puan) - Reklamasyon sayısına göre
-    reklamasyon = row.get('Reklamasyon Sayısı', 0)
-    siparis = row.get('Toplam Sipariş', 1)
-    rek_orani = calculate_complaint_rate(reklamasyon, siparis)
-    
-    # Reklamasyon oranı %5'in altındaysa tam puan
-    if rek_orani <= 5:
-        kalite_score = TOTAL_QUALITY_POINTS
-    elif rek_orani <= 10:
-        kalite_score = TOTAL_QUALITY_POINTS * 0.67
-    elif rek_orani <= 15:
-        kalite_score = TOTAL_QUALITY_POINTS * 0.33
-    else:
-        kalite_score = 0
-    score += kalite_score
-    
-    return round(score, 1)
+    try:
+        score = 0
+        
+        # Sertifika puanı (40 puan)
+        cert_score = 0
+        certs = ['ISO 9001', 'OEKO-TEX', 'BSCI']
+        for cert in certs:
+            if cert in row.index and row.get(cert) == 'Var':
+                cert_score += CERT_SCORE_PER_CERTIFICATE
+        score += min(cert_score, TOTAL_CERT_POINTS)
+        
+        # Termin uyumu (30 puan)
+        termin_uyum = row.get('Termin Uyum %', 0) if 'Termin Uyum %' in row.index else 0
+        if termin_uyum:
+            score += (float(termin_uyum) / 100) * TOTAL_DELIVERY_POINTS
+        
+        # Kalite uyumu (30 puan) - Reklamasyon sayısına göre
+        reklamasyon = row.get('Reklamasyon Sayısı', 0) if 'Reklamasyon Sayısı' in row.index else 0
+        siparis = row.get('Toplam Sipariş', 1) if 'Toplam Sipariş' in row.index else 1
+        
+        # Eğer sipariş 0 ise division by zero hatası önlemek için 1 kullan
+        if siparis == 0:
+            siparis = 1
+            
+        rek_orani = calculate_complaint_rate(reklamasyon, siparis)
+        
+        # Reklamasyon oranı %5'in altındaysa tam puan
+        if rek_orani <= 5:
+            kalite_score = TOTAL_QUALITY_POINTS
+        elif rek_orani <= 10:
+            kalite_score = TOTAL_QUALITY_POINTS * 0.67
+        elif rek_orani <= 15:
+            kalite_score = TOTAL_QUALITY_POINTS * 0.33
+        else:
+            kalite_score = 0
+        score += kalite_score
+        
+        return round(score, 1)
+    except Exception as e:
+        print(f"⚠️ Uyarı: Skor hesaplama hatası - {str(e)}")
+        return 0.0  # Varsayılan skor
 
 def get_risk_level(score):
     """Risk seviyesi belirle"""
@@ -8366,8 +8376,20 @@ def init_compliance_analysis_tab():
                  font=("Segoe UI", 12), bg="#ecf0f1", fg="#e74c3c").pack(pady=50)
         return
     
+    print(f"🔧 DEBUG: Veri kolonları: {list(df_uyumluluk_global.columns)}")
+    
     # Calculate compliance scores
-    df_uyumluluk_global['Compliance Score'] = df_uyumluluk_global.apply(calculate_compliance_score, axis=1)
+    try:
+        print("🔧 DEBUG: Uyumluluk skorları hesaplanıyor...")
+        df_uyumluluk_global['Compliance Score'] = df_uyumluluk_global.apply(calculate_compliance_score, axis=1)
+        print("🔧 DEBUG: Uyumluluk skorları hesaplandı ✓")
+    except Exception as e:
+        print(f"❌ HATA: Uyumluluk skoru hesaplama hatası: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        # Varsayılan skor ata
+        df_uyumluluk_global['Compliance Score'] = 0
+        messagebox.showwarning("Uyarı", f"Uyumluluk skorları hesaplanamadı. Varsayılan değerler kullanılıyor.\n\nHata: {str(e)}")
     
     # KPI Kartları
     kpi_container = tk.Frame(content, bg="#ecf0f1")
