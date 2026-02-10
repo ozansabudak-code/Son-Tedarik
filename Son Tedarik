@@ -7625,7 +7625,8 @@ def check_certificate_expiry(row, cert_name, cert_date_col):
             return f"🟡 {days_left} Gün", "#f39c12", 2
         else:
             return f"🟢 {days_left} Gün", "#27ae60", 3
-    except (ValueError, TypeError, KeyError):
+    except (ValueError, TypeError, KeyError) as e:
+        print(f"Sertifika tarihi hatası ({cert_name}): {str(e)}")
         return "⚪ Hata", "gray", 999
 
 def calculate_compliance_score(row):
@@ -7877,10 +7878,21 @@ def init_compliance_center_tab():
     
     fig2, ax2 = plt.subplots(figsize=(6, 4), facecolor='white')
     
-    # Calculate complaint rate
-    termin_uyum = df_uyumluluk_global.get('Termin Uyum %', [0]*len(df_uyumluluk_global))
-    reklamasyon = df_uyumluluk_global.get('Reklamasyon Sayısı', [0]*len(df_uyumluluk_global))
-    siparis = df_uyumluluk_global.get('Toplam Sipariş', [1]*len(df_uyumluluk_global))
+    # Calculate complaint rate - handle missing columns
+    if 'Termin Uyum %' in df_uyumluluk_global.columns:
+        termin_uyum = df_uyumluluk_global['Termin Uyum %'].fillna(0).tolist()
+    else:
+        termin_uyum = [0] * len(df_uyumluluk_global)
+    
+    if 'Reklamasyon Sayısı' in df_uyumluluk_global.columns:
+        reklamasyon = df_uyumluluk_global['Reklamasyon Sayısı'].fillna(0).tolist()
+    else:
+        reklamasyon = [0] * len(df_uyumluluk_global)
+    
+    if 'Toplam Sipariş' in df_uyumluluk_global.columns:
+        siparis = df_uyumluluk_global['Toplam Sipariş'].fillna(1).tolist()
+    else:
+        siparis = [1] * len(df_uyumluluk_global)
     
     rek_orani = [(r/s)*100 if s > 0 else 0 for r, s in zip(reklamasyon, siparis)]
     bubble_sizes = [s*2 for s in siparis]  # Bubble size based on order volume
@@ -7933,7 +7945,9 @@ def init_compliance_center_tab():
                         'date': audit_date,
                         'days': days_left
                     })
-            except (ValueError, TypeError, AttributeError):
+            except (ValueError, TypeError, AttributeError) as e:
+                supplier_name = row.get('Tedarikçi Adı', 'Bilinmeyen')
+                print(f"Denetim tarihi hatası ({supplier_name}): {str(e)}")
                 pass
     
     if upcoming_audits:
