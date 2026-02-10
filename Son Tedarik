@@ -7625,7 +7625,7 @@ def check_certificate_expiry(row, cert_name, cert_date_col):
             return f"🟡 {days_left} Gün", "#f39c12", 2
         else:
             return f"🟢 {days_left} Gün", "#27ae60", 3
-    except:
+    except (ValueError, TypeError, KeyError):
         return "⚪ Hata", "gray", 999
 
 def calculate_compliance_score(row):
@@ -7821,18 +7821,18 @@ def init_compliance_center_tab():
     
     # Insert data
     for idx, row in df_uyumluluk_global.iterrows():
-        iso_status = check_certificate_expiry(row, 'ISO 9001', 'ISO 9001 Bitiş')
-        oeko_status = check_certificate_expiry(row, 'OEKO-TEX', 'OEKO-TEX Bitiş')
-        bsci_status = check_certificate_expiry(row, 'BSCI', 'BSCI Bitiş')
+        iso_status_text, iso_color, iso_priority = check_certificate_expiry(row, 'ISO 9001', 'ISO 9001 Bitiş')
+        oeko_status_text, oeko_color, oeko_priority = check_certificate_expiry(row, 'OEKO-TEX', 'OEKO-TEX Bitiş')
+        bsci_status_text, bsci_color, bsci_priority = check_certificate_expiry(row, 'BSCI', 'BSCI Bitiş')
         
         score = row.get('Compliance Score', 0)
         risk, risk_color = get_risk_level(score)
         
         tree.insert("", "end", values=(
             row.get('Tedarikçi Adı', ''),
-            iso_status,
-            oeko_status,
-            bsci_status,
+            iso_status_text,
+            oeko_status_text,
+            bsci_status_text,
             f"{score:.1f}",
             risk
         ))
@@ -7933,7 +7933,7 @@ def init_compliance_center_tab():
                         'date': audit_date,
                         'days': days_left
                     })
-            except:
+            except (ValueError, TypeError, AttributeError):
                 pass
     
     if upcoming_audits:
