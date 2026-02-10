@@ -8288,6 +8288,34 @@ def init_compliance_analysis_tab():
     tk.Label(header, text="Sertifika takibi, kalite skoru, risk analizi ve AI destekli uyumluluk değerlendirmesi", 
              font=("Segoe UI", 11), fg="#ecf0f1", bg="#16a085").pack(anchor="w")
     
+    # Veri durumu bilgisi - YENI
+    data_status_frame = tk.Frame(header, bg="#16a085")
+    data_status_frame.pack(fill="x", pady=(10, 0))
+    
+    # Ana veri durumu
+    main_data_status = "✅ Yüklendi" if df_uyumluluk_global is not None and not df_uyumluluk_global.empty else "⚠️ Örnek Veri"
+    main_data_count = len(df_uyumluluk_global) if df_uyumluluk_global is not None else 0
+    
+    # Sertifika veri durumu
+    cert_data_status = "✅ Yüklendi" if df_sertifika_trafik_global is not None and not df_sertifika_trafik_global.empty else "⚠️ Örnek Veri"
+    cert_data_count = len(df_sertifika_trafik_global) if df_sertifika_trafik_global is not None else 0
+    
+    status_text = f"📁 Ana Veri: {main_data_status} ({main_data_count} kayıt)  |  📜 Sertifika Verisi: {cert_data_status} ({cert_data_count} kayıt)"
+    tk.Label(data_status_frame, text=status_text, font=("Segoe UI", 9), 
+             fg="white", bg="#16a085").pack(anchor="w")
+    
+    # Dosya yolu bilgisi
+    if df_sertifika_trafik_global is None or df_sertifika_trafik_global.empty:
+        tk.Label(data_status_frame, 
+                text=f"⚠️ Sertifika dosyası bulunamadı: {os.path.basename(sertifika_trafik_path)}", 
+                font=("Segoe UI", 8, "italic"), 
+                fg="#f39c12", bg="#16a085").pack(anchor="w")
+    else:
+        tk.Label(data_status_frame, 
+                text=f"📂 Yüklenen dosya: {os.path.basename(sertifika_trafik_path)}", 
+                font=("Segoe UI", 8, "italic"), 
+                fg="#ecf0f1", bg="#16a085").pack(anchor="w")
+    
     # Scrollable canvas container
     canvas_container = tk.Frame(frame_compliance_analysis)
     canvas_container.pack(fill="both", expand=True)
@@ -8634,6 +8662,33 @@ def init_compliance_analysis_tab():
     
     audit_text.config(state="disabled")
     
+    # ⭐ BURADA AI BUTONU VE KAYIT BUTONU VAR - BİLGİ PANELİ
+    info_panel = tk.Frame(content, bg="#3498db", padx=15, pady=10, relief="solid", bd=2)
+    info_panel.pack(fill="x", pady=(0, 15))
+    
+    tk.Label(info_panel, text="⭐ ÖNEMLİ BİLGİ", font=("Segoe UI", 12, "bold"),
+             bg="#3498db", fg="white").pack(anchor="w")
+    tk.Label(info_panel, text="• Bu sayfada AI analizi butonu ve Excel'e kaydetme butonu bulunmaktadır",
+             font=("Segoe UI", 10), bg="#3498db", fg="white").pack(anchor="w", padx=20)
+    tk.Label(info_panel, text="• AI butonu için aşağı kaydırın (büyük mor buton)",
+             font=("Segoe UI", 10), bg="#3498db", fg="white").pack(anchor="w", padx=20)
+    tk.Label(info_panel, text="• Kaydetme butonu AI butonunun altındadır (büyük yeşil buton)",
+             font=("Segoe UI", 10), bg="#3498db", fg="white").pack(anchor="w", padx=20)
+    
+    # Yenile butonu
+    def refresh_data():
+        """Verileri yeniden yükle"""
+        init_compliance_analysis_tab()
+        messagebox.showinfo("Yenilendi", "Veriler yeniden yüklendi!")
+    
+    refresh_btn = tk.Button(info_panel, text="🔄 Verileri Yenile", 
+                           font=("Segoe UI", 10, "bold"),
+                           bg="#2ecc71", fg="white",
+                           relief="raised", bd=2,
+                           cursor="hand2", padx=15, pady=5,
+                           command=refresh_data)
+    refresh_btn.pack(anchor="e", pady=(5, 0))
+    
     # AI Analiz Bölümü - GELİŞTİRİLMİŞ
     ai_frame = tk.LabelFrame(content, text="🤖 AI Destekli Uyumluluk Analizi", 
                             font=("Segoe UI", 14, "bold"), bg="white", fg="#8e44ad",
@@ -8769,6 +8824,98 @@ def init_compliance_analysis_tab():
                            text="⚠️ Not: Kaydetme işlemi mevcut Excel dosyasını güncelleyecektir.", 
                            font=("Segoe UI", 9, "italic"), bg="white", fg="gray")
     save_warning.pack(pady=(10, 0))
+    
+    # Yeni Tedarikçi Ekleme Formu
+    add_supplier_frame = tk.LabelFrame(content, text="➕ Yeni Tedarikçi Ekle", 
+                                      font=("Segoe UI", 13, "bold"), bg="white", fg="#3498db",
+                                      padx=15, pady=15, relief="solid", bd=2)
+    add_supplier_frame.pack(fill="x", pady=(0, 15))
+    
+    tk.Label(add_supplier_frame, 
+            text="📝 Yeni tedarikçi eklemek için aşağıdaki formu doldurun ve 'Ekle' butonuna tıklayın:",
+            font=("Segoe UI", 10), bg="white", fg="#2c3e50", wraplength=700, justify="left").pack(pady=(0, 10))
+    
+    # Form grid
+    form_grid = tk.Frame(add_supplier_frame, bg="white")
+    form_grid.pack(fill="x")
+    
+    # Form fields
+    tk.Label(form_grid, text="Tedarikçi Adı *:", font=("Segoe UI", 10, "bold"), bg="white").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+    supplier_name_entry = tk.Entry(form_grid, font=("Segoe UI", 10), width=30)
+    supplier_name_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+    
+    tk.Label(form_grid, text="Yetkili Kişi:", font=("Segoe UI", 10, "bold"), bg="white").grid(row=0, column=2, sticky="w", padx=5, pady=5)
+    contact_entry = tk.Entry(form_grid, font=("Segoe UI", 10), width=25)
+    contact_entry.grid(row=0, column=3, padx=5, pady=5, sticky="ew")
+    
+    tk.Label(form_grid, text="Telefon:", font=("Segoe UI", 10, "bold"), bg="white").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+    phone_entry = tk.Entry(form_grid, font=("Segoe UI", 10), width=30)
+    phone_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+    
+    tk.Label(form_grid, text="Mail:", font=("Segoe UI", 10, "bold"), bg="white").grid(row=1, column=2, sticky="w", padx=5, pady=5)
+    mail_entry = tk.Entry(form_grid, font=("Segoe UI", 10), width=25)
+    mail_entry.grid(row=1, column=3, padx=5, pady=5, sticky="ew")
+    
+    form_grid.grid_columnconfigure(1, weight=1)
+    form_grid.grid_columnconfigure(3, weight=1)
+    
+    def add_new_supplier():
+        """Yeni tedarikçi ekle"""
+        global df_uyumluluk_global
+        
+        supplier_name = supplier_name_entry.get().strip()
+        if not supplier_name:
+            messagebox.showwarning("Uyarı", "Tedarikçi adı zorunludur!")
+            return
+        
+        # Yeni satır oluştur
+        new_row = pd.DataFrame({
+            'Tedarikçi Adı': [supplier_name],
+            'Yetkili Kişi': [contact_entry.get().strip()],
+            'Telefon': [phone_entry.get().strip()],
+            'Adres': [''],
+            'Alım Türü': [''],
+            'Tür': [''],
+            'Mail': [mail_entry.get().strip()],
+            'Başlangıç Tarihi': [datetime.now().strftime('%Y-%m-%d')],
+            'Bitiş Tarihi': [''],
+            'Kayıt Tarihi': [datetime.now().strftime('%Y-%m-%d')],
+            'Eksik Evraklar': [''],
+            'ISO 9001': ['Yok'],
+            'ISO 9001 Bitiş': [None],
+            'OEKO-TEX': ['Yok'],
+            'OEKO-TEX Bitiş': [None],
+            'BSCI': ['Yok'],
+            'BSCI Bitiş': [None],
+            'Termin Uyum %': [0],
+            'Reklamasyon Sayısı': [0],
+            'Toplam Sipariş': [0],
+            'Son Denetim': [''],
+            'Sonraki Denetim': ['']
+        })
+        
+        # DataFrame'e ekle
+        df_uyumluluk_global = pd.concat([df_uyumluluk_global, new_row], ignore_index=True)
+        
+        # Formu temizle
+        supplier_name_entry.delete(0, tk.END)
+        contact_entry.delete(0, tk.END)
+        phone_entry.delete(0, tk.END)
+        mail_entry.delete(0, tk.END)
+        
+        messagebox.showinfo("Başarılı", f"'{supplier_name}' eklendi! Excel'e kaydetmeyi unutmayın.")
+        
+        if activity_logger:
+            activity_logger.log_event("SUPPLIER_ADD", f"Yeni tedarikçi eklendi: {supplier_name}", "Uyumluluk Analizi")
+    
+    add_btn = tk.Button(add_supplier_frame, text="➕ Tedarikçi Ekle", 
+                       font=("Segoe UI", 11, "bold"),
+                       bg="#3498db", fg="white",
+                       activebackground="#5dade2", activeforeground="white",
+                       relief="raised", bd=3,
+                       cursor="hand2", padx=25, pady=10,
+                       command=add_new_supplier)
+    add_btn.pack(pady=(10, 0))
 
 # ---------- GUI BAŞLATILMASI ----------
 def show_page(page_name):
