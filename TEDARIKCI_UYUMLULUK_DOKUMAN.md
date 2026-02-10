@@ -121,12 +121,13 @@ Gemini API kullanarak:
 
 ## Excel Veri Yapısı
 
-### Dosya Yolu
-`X:\01.Public\TEDARİKÇİ PERFORMANS\Cari Bilgiler\Cari Bilgiler.xlsx`
+### 1. Ana Veri Dosyası (Cari Bilgiler)
 
-### Gerekli Kolonlar
+**Dosya Yolu:** `X:\01.Public\TEDARİKÇİ PERFORMANS\Cari Bilgiler\Cari Bilgiler.xlsx`
 
-#### Temel Bilgiler
+#### Gerekli Kolonlar
+
+##### Temel Bilgiler
 ```
 Tedarikçi Adı          | string  | Zorunlu
 Yetkili Kişi           | string  | Opsiyonel
@@ -141,7 +142,7 @@ Kayıt Tarihi           | date    | YYYY-MM-DD formatında
 Eksik Evraklar         | string  | Eksik belge listesi (virgülle ayrılmış)
 ```
 
-#### Sertifika Bilgileri
+##### Sertifika Bilgileri
 ```
 ISO 9001               | string  | "Var" veya "Yok"
 ISO 9001 Bitiş         | date    | YYYY-MM-DD formatında
@@ -151,7 +152,7 @@ BSCI                   | string  | "Var" veya "Yok"
 BSCI Bitiş             | date    | YYYY-MM-DD formatında
 ```
 
-#### Performans Metrikleri
+##### Performans Metrikleri
 ```
 Termin Uyum %          | number  | 0-100 arası
 Reklamasyon Sayısı     | number  | Pozitif tam sayı
@@ -160,7 +161,7 @@ Son Denetim            | date    | YYYY-MM-DD formatında
 Sonraki Denetim        | date    | YYYY-MM-DD formatında
 ```
 
-### Örnek Veri
+#### Örnek Veri
 
 ```csv
 Tedarikçi Adı,Yetkili Kişi,Telefon,Adres,Alım Türü,Tür,Mail,Başlangıç Tarihi,Bitiş Tarihi,Kayıt Tarihi,Eksik Evraklar,ISO 9001,ISO 9001 Bitiş,OEKO-TEX,OEKO-TEX Bitiş,BSCI,BSCI Bitiş,Termin Uyum %,Reklamasyon Sayısı,Toplam Sipariş,Son Denetim,Sonraki Denetim
@@ -169,13 +170,65 @@ ABC Tekstil,Ahmet Yılmaz,0532 111 2233,İstanbul,İthalat,Tekstil,info@abctekst
 
 ---
 
+### 2. Sertifika Durumu ve Trafik Işığı Dosyası
+
+**Dosya Yolu:** `X:\01.Public\TEDARİKÇİ PERFORMANS\Cari Bilgiler\Sertifika Durumu Trafik ışığı.xlsx`
+
+**⚠️ ÖNEMLİ:** Bu dosya ayrı bir Excel dosyasıdır ve yalnızca sertifika bilgilerini içerir.
+
+#### Gerekli Kolonlar (11 Kolon)
+
+```
+1.  Tedarikçi Adı      | string  | Zorunlu - Ana dosya ile eşleşmeli
+2.  ISO 9001           | string  | "Var" veya "Yok"
+3.  ISO 9001 Bitiş     | date    | YYYY-MM-DD formatında
+4.  OEKO-TEX           | string  | "Var" veya "Yok"
+5.  OEKO-TEX Bitiş     | date    | YYYY-MM-DD formatında
+6.  BSCI               | string  | "Var" veya "Yok"
+7.  BSCI Bitiş         | date    | YYYY-MM-DD formatında
+8.  ISO 14001          | string  | "Var" veya "Yok"
+9.  ISO 14001 Bitiş    | date    | YYYY-MM-DD formatında
+10. SEDEX              | string  | "Var" veya "Yok"
+11. SEDEX Bitiş        | date    | YYYY-MM-DD formatında
+```
+
+#### UI'da Görünen 8 Sütun
+
+Uygulamada sertifika tablosunda şu 8 sütun görüntülenir:
+1. **Tedarikçi** - Tedarikçi adı
+2. **ISO 9001** - Sertifika durumu + trafik ışığı
+3. **OEKO-TEX** - Sertifika durumu + trafik ışığı
+4. **BSCI** - Sertifika durumu + trafik ışığı
+5. **ISO 14001** - Sertifika durumu + trafik ışığı
+6. **SEDEX** - Sertifika durumu + trafik ışığı
+7. **Uyumluluk Skoru** - Ana dosyadan hesaplanır
+8. **Risk** - Skordan türetilir
+
+**Not:** "Uyumluluk Skoru" ve "Risk" Excel'de bulunmaz, otomatik hesaplanır.
+
+#### Örnek Veri
+
+```csv
+Tedarikçi Adı,ISO 9001,ISO 9001 Bitiş,OEKO-TEX,OEKO-TEX Bitiş,BSCI,BSCI Bitiş,ISO 14001,ISO 14001 Bitiş,SEDEX,SEDEX Bitiş
+ABC Tekstil,Var,2026-06-15,Var,2026-09-20,Var,2026-04-10,Var,2026-03-20,Var,2026-12-30
+XYZ Kimya,Var,2025-12-30,Yok,,Var,2026-07-25,Yok,,Var,2026-01-15
+```
+
+**📄 Detaylı Format Açıklaması:** Bkz. `Sertifika_Excel_Format.md`
+
+**📋 Şablon Dosya:** Bkz. `Sertifika_Template.csv`
+
+---
+
 ## Teknik Detaylar
 
 ### Global Değişkenler
 
 ```python
-df_uyumluluk_global = None  # Uyumluluk verileri DataFrame
+df_uyumluluk_global = None  # Uyumluluk verileri DataFrame (Ana veri)
+df_sertifika_trafik_global = None  # Sertifika durumu ve trafik ışığı verisi
 cari_bilgiler_path = r"X:\01.Public\TEDARİKÇİ PERFORMANS\Cari Bilgiler\Cari Bilgiler.xlsx"
+sertifika_trafik_path = r"X:\01.Public\TEDARİKÇİ PERFORMANS\Cari Bilgiler\Sertifika Durumu Trafik ışığı.xlsx"
 ```
 
 ### Sabitler
