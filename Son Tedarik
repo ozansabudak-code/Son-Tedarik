@@ -253,7 +253,9 @@ commodity_history_global = {}
 
 # Tedarikçi Uyumluluk Merkezi Global Değişkenler
 df_uyumluluk_global = None
+df_sertifika_trafik_global = None  # Sertifika durumu ve trafik ışığı verisi
 cari_bilgiler_path = r"X:\01.Public\TEDARİKÇİ PERFORMANS\Cari Bilgiler\Cari Bilgiler.xlsx"
+sertifika_trafik_path = r"X:\01.Public\TEDARİKÇİ PERFORMANS\Cari Bilgiler\Sertifika Durumu Trafik ışığı.xlsx"
 
 # Frame Yönetimi Global Değişkenler
 frames = {} 
@@ -7639,6 +7641,75 @@ def load_cari_bilgiler():
             activity_logger.log_error(f"Excel yükleme hatası: {str(e)}", "Uyumluluk Analizi")
         return False
 
+def load_sertifika_trafik():
+    """Sertifika Durumu ve Trafik Işığı Excel'ini yükle"""
+    global df_sertifika_trafik_global
+    
+    try:
+        if os.path.exists(sertifika_trafik_path):
+            df_sertifika_trafik_global = pd.read_excel(sertifika_trafik_path)
+            if activity_logger:
+                activity_logger.log_data_load("Sertifika Trafik", len(df_sertifika_trafik_global), "Uyumluluk Analizi")
+            return True
+        else:
+            # Örnek veri - Sertifika trafik verisi
+            df_sertifika_trafik_global = pd.DataFrame({
+                'Tedarikçi Adı': ['ABC Tekstil', 'XYZ Kimya', 'DEF Kumaş', 'GHI İplik', 'JKL Boya'],
+                'ISO 9001': ['Var', 'Var', 'Yok', 'Yok', 'Var'],
+                'ISO 9001 Bitiş': ['2026-06-15', '2025-12-30', None, None, '2025-03-10'],
+                'OEKO-TEX': ['Var', 'Yok', 'Var', 'Var', 'Yok'],
+                'OEKO-TEX Bitiş': ['2026-09-20', None, '2026-05-15', '2025-11-30', None],
+                'BSCI': ['Var', 'Var', 'Yok', 'Var', 'Var'],
+                'BSCI Bitiş': ['2026-04-10', '2026-07-25', None, '2025-10-05', '2026-01-15'],
+                'ISO 14001': ['Var', 'Yok', 'Var', 'Yok', 'Var'],
+                'ISO 14001 Bitiş': ['2026-03-20', None, '2026-08-10', None, '2025-11-15'],
+                'SEDEX': ['Var', 'Var', 'Yok', 'Var', 'Yok'],
+                'SEDEX Bitiş': ['2026-12-30', '2026-01-15', None, '2025-10-20', None]
+            })
+            if activity_logger:
+                activity_logger.log_event("SAMPLE_DATA", "Sertifika trafik örnek veri kullanıldı", "Uyumluluk Analizi")
+            return False
+    except Exception as e:
+        # Hata durumunda örnek veri
+        df_sertifika_trafik_global = pd.DataFrame({
+            'Tedarikçi Adı': ['ABC Tekstil', 'XYZ Kimya', 'DEF Kumaş', 'GHI İplik', 'JKL Boya'],
+            'ISO 9001': ['Var', 'Var', 'Yok', 'Yok', 'Var'],
+            'ISO 9001 Bitiş': ['2026-06-15', '2025-12-30', None, None, '2025-03-10'],
+            'OEKO-TEX': ['Var', 'Yok', 'Var', 'Var', 'Yok'],
+            'OEKO-TEX Bitiş': ['2026-09-20', None, '2026-05-15', '2025-11-30', None],
+            'BSCI': ['Var', 'Var', 'Yok', 'Var', 'Var'],
+            'BSCI Bitiş': ['2026-04-10', '2026-07-25', None, '2025-10-05', '2026-01-15'],
+            'ISO 14001': ['Var', 'Yok', 'Var', 'Yok', 'Var'],
+            'ISO 14001 Bitiş': ['2026-03-20', None, '2026-08-10', None, '2025-11-15'],
+            'SEDEX': ['Var', 'Var', 'Yok', 'Var', 'Yok'],
+            'SEDEX Bitiş': ['2026-12-30', '2026-01-15', None, '2025-10-20', None]
+        })
+        if activity_logger:
+            activity_logger.log_error(f"Sertifika trafik yükleme hatası: {str(e)}", "Uyumluluk Analizi")
+        return False
+
+def save_to_excel():
+    """Mevcut veriyi Excel dosyasına kaydet"""
+    global df_uyumluluk_global
+    
+    try:
+        if df_uyumluluk_global is None or df_uyumluluk_global.empty:
+            return False, "Kaydedilecek veri yok!"
+        
+        # Excel'e kaydet
+        df_uyumluluk_global.to_excel(cari_bilgiler_path, index=False)
+        
+        if activity_logger:
+            activity_logger.log_event("EXCEL_SAVE", f"Veri kaydedildi: {len(df_uyumluluk_global)} kayıt", "Uyumluluk Analizi")
+        
+        return True, f"✅ {len(df_uyumluluk_global)} kayıt başarıyla kaydedildi!"
+        
+    except Exception as e:
+        error_msg = f"Excel kaydetme hatası: {str(e)}"
+        if activity_logger:
+            activity_logger.log_error(error_msg, "Uyumluluk Analizi")
+        return False, f"❌ {error_msg}"
+
 def check_certificate_expiry(row, cert_name, cert_date_col):
     """Sertifika son kullanma tarihini kontrol et ve trafik ışığı döndür
     
@@ -8200,13 +8271,14 @@ def init_compliance_docs_tab():
 
 def init_compliance_analysis_tab():
     """Uyumluluk Analizi - Sertifika, Kalite ve Termin Takip Sistemi"""
-    global df_uyumluluk_global
+    global df_uyumluluk_global, df_sertifika_trafik_global
     
     for widget in frame_compliance_analysis.winfo_children():
         widget.destroy()
     
     # Veriyi yükle
     load_cari_bilgiler()
+    load_sertifika_trafik()  # Sertifika trafik verisini de yükle
     
     # Başlık - Turkuaz arka plan
     header = tk.Frame(frame_compliance_analysis, bg="#16a085", padx=20, pady=20)
@@ -8345,42 +8417,93 @@ def init_compliance_analysis_tab():
     detail_tree.configure(xscrollcommand=detail_tree_hscroll.set)
     detail_tree_hscroll.pack(fill="x")
     
-    # Sertifika Takip Tablosu
-    cert_frame = tk.LabelFrame(content, text="📜 Sertifika Durumu ve Trafik Işığı", 
+    # Sertifika Takip Tablosu - Ayrı Excel'den yüklenen veri
+    cert_frame = tk.LabelFrame(content, text="📜 Sertifika Durumu ve Trafik Işığı (Ayrı Dosyadan)", 
                                font=("Segoe UI", 13, "bold"), bg="white", fg="#16a085",
                                padx=15, pady=15, relief="solid", bd=2)
     cert_frame.pack(fill="x", pady=(0, 15))
+    
+    # Dosya yolu bilgisi
+    path_label = tk.Label(cert_frame, 
+                          text=f"📂 Kaynak: {os.path.basename(sertifika_trafik_path)}", 
+                          font=("Segoe UI", 8, "italic"), bg="white", fg="gray")
+    path_label.pack(anchor="w", pady=(0, 5))
     
     # Tablo için frame ve scrollbar
     table_container = tk.Frame(cert_frame, bg="white")
     table_container.pack(fill="both", expand=True)
     
-    # Treeview
-    columns = ("Tedarikçi", "ISO 9001", "OEKO-TEX", "BSCI", "Uyumluluk Skoru", "Risk Seviyesi")
+    # Treeview - Genişletilmiş sertifika listesi
+    columns = ("Tedarikçi", "ISO 9001", "OEKO-TEX", "BSCI", "ISO 14001", "SEDEX", "Uyumluluk Skoru", "Risk")
     tree = ttk.Treeview(table_container, columns=columns, show="headings", height=8)
     
     # Column headings
+    column_widths = {
+        "Tedarikçi": 120,
+        "ISO 9001": 120,
+        "OEKO-TEX": 120,
+        "BSCI": 120,
+        "ISO 14001": 120,
+        "SEDEX": 120,
+        "Uyumluluk Skoru": 120,
+        "Risk": 100
+    }
+    
     for col in columns:
         tree.heading(col, text=col)
-        tree.column(col, width=150, anchor="center")
+        tree.column(col, width=column_widths.get(col, 120), anchor="center")
     
-    # Insert data
-    for idx, row in df_uyumluluk_global.iterrows():
-        iso_status_text, _, _ = check_certificate_expiry(row, 'ISO 9001', 'ISO 9001 Bitiş')
-        oeko_status_text, _, _ = check_certificate_expiry(row, 'OEKO-TEX', 'OEKO-TEX Bitiş')
-        bsci_status_text, _, _ = check_certificate_expiry(row, 'BSCI', 'BSCI Bitiş')
-        
-        score = row.get('Compliance Score', 0)
-        risk, risk_color = get_risk_level(score)
-        
-        tree.insert("", "end", values=(
-            row.get('Tedarikçi Adı', ''),
-            iso_status_text,
-            oeko_status_text,
-            bsci_status_text,
-            f"{score:.1f}",
-            risk
-        ))
+    # Insert data - Sertifika trafik dosyasından
+    if df_sertifika_trafik_global is not None and not df_sertifika_trafik_global.empty:
+        for idx, cert_row in df_sertifika_trafik_global.iterrows():
+            # Sertifika durumları
+            iso_status_text, _, _ = check_certificate_expiry(cert_row, 'ISO 9001', 'ISO 9001 Bitiş')
+            oeko_status_text, _, _ = check_certificate_expiry(cert_row, 'OEKO-TEX', 'OEKO-TEX Bitiş')
+            bsci_status_text, _, _ = check_certificate_expiry(cert_row, 'BSCI', 'BSCI Bitiş')
+            iso14001_status_text, _, _ = check_certificate_expiry(cert_row, 'ISO 14001', 'ISO 14001 Bitiş')
+            sedex_status_text, _, _ = check_certificate_expiry(cert_row, 'SEDEX', 'SEDEX Bitiş')
+            
+            # Ana veriden uyumluluk skorunu al
+            tedarikci_adi = cert_row.get('Tedarikçi Adı', '')
+            score = 0
+            risk = "⚫ Veri Yok"
+            
+            if df_uyumluluk_global is not None and not df_uyumluluk_global.empty:
+                match = df_uyumluluk_global[df_uyumluluk_global['Tedarikçi Adı'] == tedarikci_adi]
+                if not match.empty:
+                    score = match.iloc[0].get('Compliance Score', 0)
+                    risk, risk_color = get_risk_level(score)
+            
+            tree.insert("", "end", values=(
+                tedarikci_adi,
+                iso_status_text,
+                oeko_status_text,
+                bsci_status_text,
+                iso14001_status_text,
+                sedex_status_text,
+                f"{score:.1f}",
+                risk
+            ))
+    else:
+        # Veri yoksa ana veriden göster
+        for idx, row in df_uyumluluk_global.iterrows():
+            iso_status_text, _, _ = check_certificate_expiry(row, 'ISO 9001', 'ISO 9001 Bitiş')
+            oeko_status_text, _, _ = check_certificate_expiry(row, 'OEKO-TEX', 'OEKO-TEX Bitiş')
+            bsci_status_text, _, _ = check_certificate_expiry(row, 'BSCI', 'BSCI Bitiş')
+            
+            score = row.get('Compliance Score', 0)
+            risk, risk_color = get_risk_level(score)
+            
+            tree.insert("", "end", values=(
+                row.get('Tedarikçi Adı', ''),
+                iso_status_text,
+                oeko_status_text,
+                bsci_status_text,
+                "⚫ Veri Yok",  # ISO 14001
+                "⚫ Veri Yok",  # SEDEX
+                f"{score:.1f}",
+                risk
+            ))
     
     # Scrollbar
     tree_scroll = ttk.Scrollbar(table_container, orient="vertical", command=tree.yview)
@@ -8388,6 +8511,11 @@ def init_compliance_analysis_tab():
     
     tree.pack(side="left", fill="both", expand=True)
     tree_scroll.pack(side="right", fill="y")
+    
+    # Horizontal scrollbar for wide table
+    tree_hscroll = ttk.Scrollbar(cert_frame, orient="horizontal", command=tree.xview)
+    tree.configure(xscrollcommand=tree_hscroll.set)
+    tree_hscroll.pack(fill="x")
     
     # Grafik Bölümü
     charts_container = tk.Frame(content, bg="#ecf0f1")
@@ -8506,41 +8634,46 @@ def init_compliance_analysis_tab():
     
     audit_text.config(state="disabled")
     
-    # AI Analiz Bölümü
+    # AI Analiz Bölümü - GELİŞTİRİLMİŞ
     ai_frame = tk.LabelFrame(content, text="🤖 AI Destekli Uyumluluk Analizi", 
-                            font=("Segoe UI", 13, "bold"), bg="white", fg="#9b59b6",
-                            padx=15, pady=15, relief="solid", bd=2)
+                            font=("Segoe UI", 14, "bold"), bg="white", fg="#8e44ad",
+                            padx=20, pady=20, relief="solid", bd=3)
     ai_frame.pack(fill="both", expand=True, pady=(0, 15))
     
     # AI Form
     ai_form = tk.Frame(ai_frame, bg="white")
-    ai_form.pack(fill="x", pady=(0, 10))
+    ai_form.pack(fill="x", pady=(0, 15))
     
-    tk.Label(ai_form, text="Tedarikçi Seçin:", font=("Segoe UI", 10, "bold"),
-             bg="white").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+    tk.Label(ai_form, text="Tedarikçi Seçin:", font=("Segoe UI", 11, "bold"),
+             bg="white").grid(row=0, column=0, sticky="w", padx=5, pady=8)
     
     supplier_var = tk.StringVar()
     supplier_combo = ttk.Combobox(ai_form, textvariable=supplier_var, 
                                   values=df_uyumluluk_global['Tedarikçi Adı'].tolist(),
-                                  font=("Segoe UI", 10), state="readonly", width=30)
-    supplier_combo.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+                                  font=("Segoe UI", 11), state="readonly", width=30)
+    supplier_combo.grid(row=0, column=1, padx=5, pady=8, sticky="ew")
     if len(df_uyumluluk_global) > 0:
         supplier_combo.current(0)
     
-    tk.Label(ai_form, text="Gemini API Key:", font=("Segoe UI", 10, "bold"),
-             bg="white").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+    tk.Label(ai_form, text="Gemini API Key:", font=("Segoe UI", 11, "bold"),
+             bg="white").grid(row=1, column=0, sticky="w", padx=5, pady=8)
     
-    api_key_entry = tk.Entry(ai_form, font=("Segoe UI", 10), width=30, show="*")
-    api_key_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+    api_key_entry = tk.Entry(ai_form, font=("Segoe UI", 11), width=30, show="*")
+    api_key_entry.grid(row=1, column=1, padx=5, pady=8, sticky="ew")
     # Security: Do not pre-fill API key - require user to enter each session
     
     ai_form.grid_columnconfigure(1, weight=1)
     
     # Result Text Area
-    result_text = tk.Text(ai_frame, height=12, font=("Segoe UI", 9), bg="#f8f9fa", 
+    result_text = tk.Text(ai_frame, height=12, font=("Segoe UI", 10), bg="#f8f9fa", 
                          relief="solid", bd=1, wrap="word")
     result_text.pack(fill="both", expand=True, pady=(10, 0))
-    result_text.insert("1.0", "Bir tedarikçi seçin ve 'AI Analizi Yap' butonuna tıklayın...")
+    result_text.insert("1.0", "💡 Bir tedarikçi seçin ve aşağıdaki 'AI Analizi Yap' butonuna tıklayın...\n\n"
+                             "AI analizi tedarikçinin:\n"
+                             "• Sertifika durumunu\n"
+                             "• Uyumluluk skorunu\n"
+                             "• Risk seviyesini\n"
+                             "• Genel performansını değerlendirir ve öneriler sunar.")
     result_text.config(state="disabled")
     
     def run_ai_analysis():
@@ -8586,11 +8719,56 @@ def init_compliance_analysis_tab():
         if activity_logger:
             activity_logger.log_event("AI_ANALYSIS", f"Tedarikçi: {supplier_name}", "Tedarikçi Uyumluluk")
     
-    # AI Button
-    ai_button = tk.Button(ai_frame, text="🤖 AI Analizi Yap", font=("Segoe UI", 11, "bold"),
-                         bg="#9b59b6", fg="white", relief="raised", bd=3,
-                         cursor="hand2", padx=20, pady=10, command=run_ai_analysis)
-    ai_button.pack(pady=(10, 0))
+    # AI Button - GELİŞTİRİLMİŞ VE DAHA GÖRÜNÜR
+    ai_button = tk.Button(ai_frame, text="🤖 AI İLE ANALİZ YAP", 
+                         font=("Segoe UI", 13, "bold"),
+                         bg="#8e44ad", fg="white", 
+                         activebackground="#9b59b6", activeforeground="white",
+                         relief="raised", bd=4,
+                         cursor="hand2", padx=30, pady=15, 
+                         command=run_ai_analysis)
+    ai_button.pack(pady=(15, 5))
+    
+    # AI button açıklama
+    tk.Label(ai_frame, text="↑ Bu butona tıklayarak seçili tedarikçi için AI destekli detaylı analiz yapabilirsiniz", 
+             font=("Segoe UI", 9, "italic"), bg="white", fg="gray").pack()
+    
+    # Veri Kaydetme Bölümü
+    save_frame = tk.LabelFrame(content, text="💾 Veri Kaydetme", 
+                               font=("Segoe UI", 13, "bold"), bg="white", fg="#27ae60",
+                               padx=15, pady=15, relief="solid", bd=2)
+    save_frame.pack(fill="x", pady=(0, 15))
+    
+    def save_data_to_excel():
+        """Mevcut veriyi Excel'e kaydet"""
+        success, message = save_to_excel()
+        
+        if success:
+            messagebox.showinfo("Başarılı", message)
+            if activity_logger:
+                activity_logger.log_event("DATA_SAVE", message, "Uyumluluk Analizi")
+        else:
+            messagebox.showerror("Hata", message)
+    
+    # Kaydetme butonu ve açıklama
+    save_info = tk.Label(save_frame, 
+                         text="📝 Tablodaki verilerde yaptığınız değişiklikleri Excel dosyasına kaydetmek için:", 
+                         font=("Segoe UI", 10), bg="white", fg="#2c3e50", wraplength=700, justify="left")
+    save_info.pack(pady=(0, 10))
+    
+    save_button = tk.Button(save_frame, text="💾 Excel'e Kaydet", 
+                           font=("Segoe UI", 11, "bold"),
+                           bg="#27ae60", fg="white",
+                           activebackground="#2ecc71", activeforeground="white",
+                           relief="raised", bd=3,
+                           cursor="hand2", padx=25, pady=12,
+                           command=save_data_to_excel)
+    save_button.pack()
+    
+    save_warning = tk.Label(save_frame, 
+                           text="⚠️ Not: Kaydetme işlemi mevcut Excel dosyasını güncelleyecektir.", 
+                           font=("Segoe UI", 9, "italic"), bg="white", fg="gray")
+    save_warning.pack(pady=(10, 0))
 
 # ---------- GUI BAŞLATILMASI ----------
 def show_page(page_name):
