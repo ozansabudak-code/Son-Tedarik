@@ -7611,8 +7611,6 @@ def check_certificate_expiry(row, cert_name, cert_date_col):
     Returns:
         tuple: (status_text, color, priority) - Status text with icon, color hex code, and priority (0-999)
     """
-    from datetime import datetime, timedelta
-    
     if pd.isna(row.get(cert_date_col)) or row.get(cert_name) != 'Var':
         return "⚫ Yok", "gray", 999
     
@@ -7630,8 +7628,9 @@ def check_certificate_expiry(row, cert_name, cert_date_col):
         else:
             return f"🟢 {days_left} Gün", "#27ae60", 3
     except (ValueError, TypeError, KeyError) as e:
-        print(f"Sertifika tarihi hatası ({cert_name}): {str(e)}")
-        return "⚪ Hata", "gray", 999
+        if activity_logger:
+            activity_logger.log_error(f"Sertifika tarihi hatası ({cert_name}): {str(e)}", "Tedarikçi Uyumluluk")
+        return "⚪ Tarih Hatası", "gray", 999
 
 def calculate_compliance_score(row):
     """Uyumluluk skoru hesapla (0-100)"""
@@ -7718,8 +7717,6 @@ def ai_compliance_analysis(tedarikci_adi, row):
 def init_compliance_center_tab():
     """Tedarikçi Uyumluluk Merkezi - Sertifika, Kalite ve Termin Takip Sistemi"""
     global df_uyumluluk_global
-    from datetime import datetime, timedelta
-    import glob
     
     for widget in frame_compliance.winfo_children():
         widget.destroy()
@@ -7951,7 +7948,8 @@ def init_compliance_center_tab():
                     })
             except (ValueError, TypeError, AttributeError) as e:
                 supplier_name = row.get('Tedarikçi Adı', 'Bilinmeyen')
-                print(f"Denetim tarihi hatası ({supplier_name}): {str(e)}. Beklenen format: YYYY-MM-DD")
+                if activity_logger:
+                    activity_logger.log_error(f"Denetim tarihi hatası ({supplier_name}): {str(e)}. Beklenen format: YYYY-MM-DD", "Tedarikçi Uyumluluk")
                 pass
     
     if upcoming_audits:
@@ -7990,9 +7988,7 @@ def init_compliance_center_tab():
     
     api_key_entry = tk.Entry(ai_form, font=("Segoe UI", 10), width=30, show="*")
     api_key_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
-    # Only pre-fill API key if it's explicitly set by user (not empty default)
-    if GEMINI_API_KEY and GEMINI_API_KEY.strip():
-        api_key_entry.insert(0, GEMINI_API_KEY)
+    # Security: Do not pre-fill API key - require user to enter each session
     
     ai_form.grid_columnconfigure(1, weight=1)
     
