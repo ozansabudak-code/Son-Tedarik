@@ -7606,7 +7606,11 @@ def load_cari_bilgiler():
         return False
 
 def check_certificate_expiry(row, cert_name, cert_date_col):
-    """Sertifika son kullanma tarihini kontrol et ve trafik ışığı döndür"""
+    """Sertifika son kullanma tarihini kontrol et ve trafik ışığı döndür
+    
+    Returns:
+        tuple: (status_text, color, priority) - Status text with icon, color hex code, and priority (0-999)
+    """
     from datetime import datetime, timedelta
     
     if pd.isna(row.get(cert_date_col)) or row.get(cert_name) != 'Var':
@@ -7822,9 +7826,9 @@ def init_compliance_center_tab():
     
     # Insert data
     for idx, row in df_uyumluluk_global.iterrows():
-        iso_status_text, iso_color, iso_priority = check_certificate_expiry(row, 'ISO 9001', 'ISO 9001 Bitiş')
-        oeko_status_text, oeko_color, oeko_priority = check_certificate_expiry(row, 'OEKO-TEX', 'OEKO-TEX Bitiş')
-        bsci_status_text, bsci_color, bsci_priority = check_certificate_expiry(row, 'BSCI', 'BSCI Bitiş')
+        iso_status_text, _, _ = check_certificate_expiry(row, 'ISO 9001', 'ISO 9001 Bitiş')
+        oeko_status_text, _, _ = check_certificate_expiry(row, 'OEKO-TEX', 'OEKO-TEX Bitiş')
+        bsci_status_text, _, _ = check_certificate_expiry(row, 'BSCI', 'BSCI Bitiş')
         
         score = row.get('Compliance Score', 0)
         risk, risk_color = get_risk_level(score)
@@ -7947,7 +7951,7 @@ def init_compliance_center_tab():
                     })
             except (ValueError, TypeError, AttributeError) as e:
                 supplier_name = row.get('Tedarikçi Adı', 'Bilinmeyen')
-                print(f"Denetim tarihi hatası ({supplier_name}): {str(e)}")
+                print(f"Denetim tarihi hatası ({supplier_name}): {str(e)}. Beklenen format: YYYY-MM-DD")
                 pass
     
     if upcoming_audits:
@@ -7986,7 +7990,9 @@ def init_compliance_center_tab():
     
     api_key_entry = tk.Entry(ai_form, font=("Segoe UI", 10), width=30, show="*")
     api_key_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
-    api_key_entry.insert(0, GEMINI_API_KEY)
+    # Only pre-fill API key if it's explicitly set by user (not empty default)
+    if GEMINI_API_KEY and GEMINI_API_KEY.strip():
+        api_key_entry.insert(0, GEMINI_API_KEY)
     
     ai_form.grid_columnconfigure(1, weight=1)
     
